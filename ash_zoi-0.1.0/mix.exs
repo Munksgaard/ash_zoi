@@ -9,7 +9,7 @@ defmodule AshZoi.MixProject do
       start_permanent: Mix.env() == :prod,
       name: "AshZoi",
       description: "Bridge Ash types and resources to Zoi validation schemas",
-      source_url: "https://github.com/Munksgaard/ash_zoi",
+      source_url: "https://github.com/munksgaard/ash_zoi",
       package: package(),
       docs: docs(),
       deps: deps()
@@ -19,7 +19,7 @@ defmodule AshZoi.MixProject do
   defp docs do
     [
       main: "readme",
-      extras: ["README.md", "LICENSE"]
+      extras: ["README.md"]
     ]
   end
 
@@ -27,7 +27,7 @@ defmodule AshZoi.MixProject do
     [
       maintainers: ["Philip Munksgaard"],
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/Munksgaard/ash_zoi"}
+      links: %{"GitHub" => "https://github.com/munksgaard/ash_zoi"}
     ]
   end
 

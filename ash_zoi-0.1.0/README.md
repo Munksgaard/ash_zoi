@@ -420,7 +420,6 @@ Ash constraints are automatically mapped to Zoi validations:
 - `instance_of` → Validates struct type with `Zoi.struct(module)`
 - `fields` → Typed field schemas when combined with `instance_of`
 - If `instance_of` points to an Ash resource, the resource's attributes are introspected
-
 ## Limitations
 
 The following Ash constraints are not supported or ignored:
@@ -561,8 +560,10 @@ end
 
 ## Documentation
 
-Documentation is available on [HexDocs](https://hexdocs.pm/ash_zoi).
+Full documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
+and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
+be found at <https://hexdocs.pm/ash_zoi>.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT License - see LICENSE file for details.
