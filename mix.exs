@@ -19,7 +19,7 @@ defmodule AshZoi.MixProject do
   defp docs do
     [
       main: "readme",
-      extras: ["README.md", "LICENSE"]
+      extras: ["README.md", "CHANGELOG.md", "LICENSE"]
     ]
   end
 
@@ -27,7 +27,10 @@ defmodule AshZoi.MixProject do
     [
       maintainers: ["Philip Munksgaard"],
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/Munksgaard/ash_zoi"}
+      links: %{
+        "GitHub" => "https://github.com/Munksgaard/ash_zoi",
+        "Changelog" => "https://hexdocs.pm/ash_zoi/changelog.html"
+      }
     ]
   end
 
