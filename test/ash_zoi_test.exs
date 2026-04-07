@@ -85,6 +85,23 @@ defmodule AshZoiTest do
     end
   end
 
+  # Test Ash.Type.Enum
+  defmodule TestStatus do
+    @moduledoc false
+    use Ash.Type.Enum, values: [:open, :closed, :pending]
+  end
+
+  # Test resource using an Ash.Type.Enum as an attribute
+  defmodule TestTicket do
+    @moduledoc false
+    use Ash.Resource, data_layer: :embedded
+
+    attributes do
+      attribute(:title, :string, public?: true, allow_nil?: false)
+      attribute(:status, AshZoiTest.TestStatus, public?: true, allow_nil?: false)
+    end
+  end
+
   describe "basic type conversion (no constraints)" do
     test "converts :string to Zoi string schema" do
       schema = AshZoi.to_schema(:string)
@@ -1124,6 +1141,32 @@ defmodule AshZoiTest do
                  title: "Hello",
                  content: %{"_union_type" => "number", "_union_value" => -1}
                })
+    end
+  end
+
+  describe "Ash.Type.Enum" do
+    test "converts Ash.Type.Enum to Zoi enum schema" do
+      schema = AshZoi.to_schema(AshZoiTest.TestStatus)
+
+      assert {:ok, :open} = Zoi.parse(schema, :open)
+      assert {:ok, :closed} = Zoi.parse(schema, :closed)
+      assert {:ok, :pending} = Zoi.parse(schema, :pending)
+      assert {:error, errors} = Zoi.parse(schema, :invalid)
+      assert [%Zoi.Error{code: :invalid_enum_value}] = errors
+    end
+
+    test "rejects non-atom values for Ash.Type.Enum" do
+      schema = AshZoi.to_schema(AshZoiTest.TestStatus)
+
+      assert {:error, _} = Zoi.parse(schema, "open")
+      assert {:error, _} = Zoi.parse(schema, 123)
+    end
+
+    test "Ash.Type.Enum works inside a resource attribute" do
+      schema = AshZoi.to_schema(AshZoiTest.TestTicket)
+
+      assert {:ok, _} = Zoi.parse(schema, %{title: "Bug", status: :open})
+      assert {:error, _} = Zoi.parse(schema, %{title: "Bug", status: :invalid})
     end
   end
 end

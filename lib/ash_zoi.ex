@@ -208,7 +208,7 @@ defmodule AshZoi do
     # Resolve the type module
     type_module = resolve_type(type)
 
-    # Check if it's a NewType or Ash resource
+    # Check if it's a NewType, Ash enum, or Ash resource
     cond do
       # Check if it's a NewType (including TypedStruct) before resource check
       ash_new_type?(type_module) ->
@@ -216,6 +216,9 @@ defmodule AshZoi do
         subtype_constraints = type_module.subtype_constraints()
         merged_constraints = Keyword.merge(subtype_constraints, constraints)
         to_schema_with_depth(subtype, merged_constraints, depth + 1)
+
+      ash_enum?(type_module) ->
+        Zoi.enum(type_module.values())
 
       ash_resource?(type_module) ->
         resource_to_schema(type_module, constraints)
@@ -243,6 +246,16 @@ defmodule AshZoi do
   end
 
   defp ash_new_type?(_), do: false
+
+  # Helper to check if a type is an Ash.Type.Enum
+  defp ash_enum?(type) when is_atom(type) and not is_nil(type) do
+    Code.ensure_loaded?(type) and
+      Ash.Type.Enum in (type.__info__(:attributes)
+                        |> Keyword.get_values(:behaviour)
+                        |> List.flatten())
+  end
+
+  defp ash_enum?(_), do: false
 
   # Resolve an Ash type to its module
   defp resolve_type(type) when is_atom(type) do
