@@ -54,6 +54,7 @@ defmodule AshZoi do
   - `Ash.Type.Struct` → `Zoi.struct()` (with `instance_of` and `fields`)
   - `Ash.Type.Module` → `Zoi.module()`
   - `Ash.Type.Union` → `Zoi.discriminated_union()` (using `_union_type`/`_union_value` format)
+  - `Ash.Type.Enum` → `Zoi.enum()` (custom enum types defined with `use Ash.Type.Enum`)
   - Ash Resources → `Zoi.map()` (introspected from resource attributes)
   - `Ash.Type.NewType` → Recursively resolved to underlying subtype
   - `Ash.TypedStruct` → `Zoi.map()` (introspected from typed struct fields)

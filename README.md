@@ -13,7 +13,7 @@ def deps do
   [
     {:ash, "~> 3.0"},
     {:zoi, "~> 0.17.3"},
-    {:ash_zoi, "~> 0.1.0"}
+    {:ash_zoi, "~> 0.2.0"}
   ]
 end
 ```
@@ -263,6 +263,44 @@ Zoi.parse(schema, -1)   # Violates NewType's min: 0 constraint
 #=> {:error, [%Zoi.Error{code: :greater_than_or_equal_to, ...}]}
 ```
 
+### Ash Enums
+
+Custom enum types defined with `use Ash.Type.Enum` are automatically detected and
+converted to `Zoi.enum(values)`:
+
+```elixir
+defmodule MyApp.TicketStatus do
+  use Ash.Type.Enum, values: [:open, :closed, :pending]
+end
+
+schema = AshZoi.to_schema(MyApp.TicketStatus)
+Zoi.parse(schema, :open)
+#=> {:ok, :open}
+
+Zoi.parse(schema, :invalid)
+#=> {:error, [%Zoi.Error{code: :invalid_enum_value, ...}]}
+```
+
+Enums also work as resource attribute types:
+
+```elixir
+defmodule MyApp.Ticket do
+  use Ash.Resource, data_layer: :embedded
+
+  attributes do
+    attribute :title, :string, public?: true, allow_nil?: false
+    attribute :status, MyApp.TicketStatus, public?: true, allow_nil?: false
+  end
+end
+
+schema = AshZoi.to_schema(MyApp.Ticket)
+Zoi.parse(schema, %{title: "Bug", status: :open})
+#=> {:ok, %{title: "Bug", status: :open}}
+
+Zoi.parse(schema, %{title: "Bug", status: :invalid})
+#=> {:error, [...]}
+```
+
 **Notes:**
 
 - NewTypes are automatically detected using `Ash.Type.NewType.new_type?/1`
@@ -377,6 +415,7 @@ The following Ash types are mapped to their Zoi equivalents:
 | `Ash.Type.Struct` | `Zoi.struct()` | With `instance_of` and optional `fields` constraints |
 | `Ash.Type.Module` | `Zoi.module()` | |
 | `Ash.Type.Union` | `Zoi.discriminated_union()` | Uses `_union_type`/`_union_value` format, distinguishes same-type variants |
+| `Ash.Type.Enum` | `Zoi.enum()` | Custom enum types defined with `use Ash.Type.Enum` |
 | `Ash.Type.Binary` | `Zoi.string()` | Closest equivalent |
 | `Ash.Type.NewType` | (varies) | Recursively resolved to underlying subtype with constraints |
 | `Ash.TypedStruct` | `Zoi.map()` | Introspected from typed struct fields (treated as map) |
