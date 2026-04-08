@@ -1155,10 +1155,12 @@ defmodule AshZoiTest do
       assert [%Zoi.Error{code: :invalid_enum_value}] = errors
     end
 
-    test "rejects non-atom values for Ash.Type.Enum" do
+    test "coerces string values to atoms for Ash.Type.Enum" do
       schema = AshZoi.to_schema(AshZoiTest.TestStatus)
 
-      assert {:error, _} = Zoi.parse(schema, "open")
+      assert {:ok, :open} = Zoi.parse(schema, "open")
+      assert {:ok, :closed} = Zoi.parse(schema, "closed")
+      assert {:error, _} = Zoi.parse(schema, "invalid")
       assert {:error, _} = Zoi.parse(schema, 123)
     end
 
@@ -1166,7 +1168,9 @@ defmodule AshZoiTest do
       schema = AshZoi.to_schema(AshZoiTest.TestTicket)
 
       assert {:ok, _} = Zoi.parse(schema, %{title: "Bug", status: :open})
+      assert {:ok, _} = Zoi.parse(schema, %{title: "Bug", status: "open"})
       assert {:error, _} = Zoi.parse(schema, %{title: "Bug", status: :invalid})
+      assert {:error, _} = Zoi.parse(schema, %{title: "Bug", status: "invalid"})
     end
   end
 end

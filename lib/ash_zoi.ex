@@ -219,7 +219,11 @@ defmodule AshZoi do
         to_schema_with_depth(subtype, merged_constraints, depth + 1)
 
       ash_enum?(type_module) ->
-        Zoi.enum(type_module.values())
+        # Use tuple pairs {atom_key, string_value} with coerce: true so that
+        # both atom and string inputs are accepted. Zoi.enum returns the key,
+        # so string inputs (e.g. from JSON/LLM tool calls) are coerced to atoms.
+        tuple_values = Enum.map(type_module.values(), &{&1, to_string(&1)})
+        Zoi.enum(tuple_values, coerce: true)
 
       ash_resource?(type_module) ->
         resource_to_schema(type_module, constraints)
