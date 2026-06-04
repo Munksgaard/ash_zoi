@@ -32,12 +32,13 @@ jobs:
           otp-version: ${{ matrix.otp }}
           elixir-version: ${{ matrix.elixir }}
 
-      - name: Restore dependencies cache
+      - name: Restore dependencies and PLT cache
         uses: actions/cache@v4
         with:
           path: |
             deps
             _build
+            priv/plts
           key: deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
             deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
@@ -58,7 +59,7 @@ jobs:
         run: mix credo --format sarif
 
       - name: Check dialyzer
-        run: mix dialyzer --format github
+        run: mkdir -p priv/plts && mix dialyzer --format github
 
       - name: Run tests
         run: mix test

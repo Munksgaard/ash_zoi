@@ -39,7 +39,8 @@ defmodule AshZoi.MixProject do
   defp dialyzer do
     [
       plt_add_apps: [:ash_money],
-      plt_core_path: "_build/#{Mix.env()}"
+      plt_local_path: "priv/plts/project.plt",
+      plt_core_path: "priv/plts/core.plt"
     ]
   end
 
