@@ -57,5 +57,8 @@ jobs:
       - name: Check credo
         run: mix credo
 
+      - name: Check dialyzer
+        run: mix dialyzer --format github
+
       - name: Run tests
         run: mix test

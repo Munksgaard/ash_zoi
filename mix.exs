@@ -13,7 +13,8 @@ defmodule AshZoi.MixProject do
       source_url: "https://github.com/Munksgaard/ash_zoi",
       package: package(),
       docs: docs(),
-      deps: deps()
+      deps: deps(),
+      dialyzer: dialyzer()
     ]
   end
 
@@ -35,6 +36,13 @@ defmodule AshZoi.MixProject do
     ]
   end
 
+  defp dialyzer do
+    [
+      plt_add_apps: [:ash_money],
+      plt_core_path: "_build/#{Mix.env()}"
+    ]
+  end
+
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
@@ -52,6 +60,7 @@ defmodule AshZoi.MixProject do
       {:ash_money, "~> 0.2", optional: true},
       {:zoi, "~> 0.17.3"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.35", only: :dev, runtime: false}
     ]
   end
