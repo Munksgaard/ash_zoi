@@ -55,7 +55,7 @@ jobs:
         run: mix format --check-formatted
 
       - name: Check credo
-        run: mix credo
+        run: mix credo --format sarif
 
       - name: Check dialyzer
         run: mix dialyzer --format github
