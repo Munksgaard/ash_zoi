@@ -45,6 +45,7 @@ defmodule AshZoi do
   - `Ash.Type.Boolean` → `Zoi.boolean()`
   - `Ash.Type.Atom` → `Zoi.atom()` or `Zoi.enum()` (with `one_of` constraint)
   - `Ash.Type.Decimal` → `Zoi.decimal()`
+  - `AshMoney.Types.Money` → `Zoi.map(%{currency: Zoi.string(), amount: Zoi.decimal()})` (requires optional `ash_money` dependency)
   - `Ash.Type.Date` → `Zoi.date()`
   - `Ash.Type.Time` → `Zoi.time()`
   - `Ash.Type.DateTime` → `Zoi.datetime()`
@@ -333,6 +334,17 @@ defmodule AshZoi do
   defp type_to_schema(Ash.Type.Decimal, constraints) do
     opts = map_decimal_constraints(constraints)
     Zoi.decimal(opts)
+  end
+
+  if Code.ensure_loaded?(AshMoney.Types.Money) do
+    defp type_to_schema(AshMoney.Types.Money, constraints) do
+      amount_opts = map_decimal_constraints(constraints)
+
+      Zoi.map(%{
+        currency: Zoi.string(),
+        amount: Zoi.decimal(amount_opts)
+      })
+    end
   end
 
   defp type_to_schema(Ash.Type.Date, _constraints) do

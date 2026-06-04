@@ -1144,6 +1144,56 @@ defmodule AshZoiTest do
     end
   end
 
+  describe "AshMoney.Types.Money" do
+    test "converts money to map with currency and amount" do
+      schema = AshZoi.to_schema(AshMoney.Types.Money)
+
+      assert {:ok, %{currency: "DKK", amount: amount}} =
+               Zoi.parse(schema, %{currency: "DKK", amount: Decimal.new("42.50")})
+
+      assert Decimal.equal?(amount, Decimal.new("42.50"))
+    end
+
+    test "rejects invalid money values" do
+      schema = AshZoi.to_schema(AshMoney.Types.Money)
+
+      assert {:error, _} = Zoi.parse(schema, "not money")
+      assert {:error, _} = Zoi.parse(schema, Decimal.new("42.50"))
+      assert {:error, _} = Zoi.parse(schema, %{currency: 123, amount: Decimal.new("42.50")})
+      assert {:error, _} = Zoi.parse(schema, %{currency: "DKK", amount: "not decimal"})
+    end
+
+    test "maps money min and max constraints to amount" do
+      schema = AshZoi.to_schema(AshMoney.Types.Money, min: 0, max: 1000)
+
+      assert {:ok, _} = Zoi.parse(schema, %{currency: "DKK", amount: Decimal.new("500")})
+      assert {:error, _} = Zoi.parse(schema, %{currency: "DKK", amount: Decimal.new("-1")})
+      assert {:error, _} = Zoi.parse(schema, %{currency: "DKK", amount: Decimal.new("1001")})
+    end
+
+    test "money type in a resource attribute" do
+      defmodule TestProduct do
+        @moduledoc false
+        use Ash.Resource, data_layer: :embedded
+
+        attributes do
+          attribute(:name, :string, public?: true, allow_nil?: false)
+          attribute(:price, AshMoney.Types.Money, public?: true, allow_nil?: false)
+        end
+      end
+
+      schema = AshZoi.to_schema(TestProduct)
+
+      assert {:ok, _} =
+               Zoi.parse(schema, %{
+                 name: "Widget",
+                 price: %{currency: "DKK", amount: Decimal.new("9.99")}
+               })
+
+      assert {:error, _} = Zoi.parse(schema, %{name: "Widget", price: "not money"})
+    end
+  end
+
   describe "Ash.Type.Enum" do
     test "converts Ash.Type.Enum to Zoi enum schema" do
       schema = AshZoi.to_schema(AshZoiTest.TestStatus)

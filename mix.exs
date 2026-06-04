@@ -6,6 +6,7 @@ defmodule AshZoi.MixProject do
       app: :ash_zoi,
       version: "0.2.1",
       elixir: "~> 1.18",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       name: "AshZoi",
       description: "Bridge Ash types and resources to Zoi validation schemas",
@@ -34,6 +35,9 @@ defmodule AshZoi.MixProject do
     ]
   end
 
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
+
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
@@ -45,6 +49,7 @@ defmodule AshZoi.MixProject do
   defp deps do
     [
       {:ash, "~> 3.0"},
+      {:ash_money, "~> 0.2", optional: true},
       {:zoi, "~> 0.17.3"},
       {:ex_doc, "~> 0.35", only: :dev, runtime: false}
     ]
