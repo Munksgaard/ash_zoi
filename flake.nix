@@ -13,7 +13,7 @@
       devShells = forEachSupportedSystem ({ pkgs }: {
         default = pkgs.mkShell {
           packages =
-            [ pkgs.elixir pkgs.go pkgs.gnumake pkgs.gcc ];
+            [ pkgs.elixir_1_19 pkgs.go pkgs.gnumake pkgs.gcc ];
         };
       });
     };
