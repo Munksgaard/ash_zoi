@@ -2,13 +2,14 @@
   "assignee": "Philip Munksgaard",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-04T09:14:47Z",
   "created": "2026-06-04T08:53:29Z",
   "description": "Add decimal as optional dependency. When included, emit correct Decimal type instead of Zoi.Types.Any. Falls back to Any when decimal is not available. Fixes app-beg in leaf/master.",
   "id": "ash_zoi-d5q",
   "labels": [],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Add Decimal type support to AshZoi",
   "type": "task",
-  "updated_at": "2026-06-04T08:53:32Z"
+  "updated_at": "2026-06-04T09:14:47Z"
 }
