@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-04
+
+### Added
+
+- `AshMoney.Types.Money` support — money types are now converted to
+  `Zoi.map(%{currency: Zoi.string(), amount: Zoi.decimal()})` with `min`/`max`
+  constraints applied to the amount field. Requires the optional `ash_money`
+  dependency; without it, money types fall back to `Zoi.any()`.
+
 ## [0.2.1] - 2026-04-08
 
 ### Fixed
@@ -45,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   constraints
 - Depth-limited NewType unwrapping to prevent infinite recursion
 
+[0.3.0]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.3.0
 [0.2.1]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.1.0

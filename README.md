@@ -13,7 +13,7 @@ def deps do
   [
     {:ash, "~> 3.0"},
     {:zoi, "~> 0.17.3"},
-    {:ash_zoi, "~> 0.2.0"}
+    {:ash_zoi, "~> 0.3.0"}
   ]
 end
 ```
@@ -301,6 +301,36 @@ Zoi.parse(schema, %{title: "Bug", status: :invalid})
 #=> {:error, [...]}
 ```
 
+### AshMoney Support
+
+If you use [`ash_money`](https://hexdocs.pm/ash_money), add it to your dependencies and
+`AshMoney.Types.Money` fields will be converted to a map schema with `currency` (string)
+and `amount` (decimal) fields:
+
+```elixir
+# In mix.exs:
+{:ash_money, "~> 0.2"}
+
+# Money attributes in resources
+defmodule MyApp.Product do
+  use Ash.Resource, data_layer: :embedded
+
+  attributes do
+    attribute :name, :string, public?: true, allow_nil?: false
+    attribute :price, AshMoney.Types.Money, public?: true, allow_nil?: false
+  end
+end
+
+schema = AshZoi.to_schema(MyApp.Product)
+Zoi.parse(schema, %{name: "Widget", price: %{currency: "USD", amount: Decimal.new("9.99")}})
+#=> {:ok, %{name: "Widget", price: %{currency: "USD", amount: #Decimal<9.99>}}}
+
+# min/max constraints apply to the amount
+schema = AshZoi.to_schema(AshMoney.Types.Money, min: 0, max: 1000)
+```
+
+Without `ash_money` in your dependencies, money types fall back to `Zoi.any()`.
+
 **Notes:**
 
 - NewTypes are automatically detected using `Ash.Type.NewType.new_type?/1`
@@ -406,6 +436,7 @@ The following Ash types are mapped to their Zoi equivalents:
 | `Ash.Type.Boolean` | `Zoi.boolean()` | |
 | `Ash.Type.Atom` | `Zoi.atom()` or `Zoi.enum()` | With `one_of` constraint → `Zoi.enum()` |
 | `Ash.Type.Decimal` | `Zoi.decimal()` | Supports `min`, `max`, `greater_than`, `less_than` |
+| `AshMoney.Types.Money` | `Zoi.map(%{currency, amount})` | Optional `ash_money` dep; `min`/`max` apply to amount |
 | `Ash.Type.Date` | `Zoi.date()` | |
 | `Ash.Type.Time` | `Zoi.time()` | `TimeUsec` also maps to `time()` |
 | `Ash.Type.DateTime` | `Zoi.datetime()` | All datetime variants map to `datetime()` |
