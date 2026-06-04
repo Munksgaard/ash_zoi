@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "Philip Munksgaard",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-06-04T08:53:29Z",
@@ -7,8 +7,8 @@
   "id": "ash_zoi-d5q",
   "labels": [],
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Add Decimal type support to AshZoi",
   "type": "task",
-  "updated_at": "2026-06-04T08:53:29Z"
+  "updated_at": "2026-06-04T08:53:32Z"
 }
