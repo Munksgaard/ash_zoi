@@ -3,7 +3,7 @@ defmodule AshZoiTest.SimpleStruct do
 end
 
 defmodule AshZoiTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   doctest AshZoi
 
   # Test Ash resources for testing resource conversion

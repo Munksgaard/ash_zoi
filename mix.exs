@@ -51,6 +51,7 @@ defmodule AshZoi.MixProject do
       {:ash, "~> 3.0"},
       {:ash_money, "~> 0.2", optional: true},
       {:zoi, "~> 0.17.3"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.35", only: :dev, runtime: false}
     ]
   end

@@ -148,6 +148,10 @@ defmodule AshZoi do
   - Unknown/unsupported Ash types fall back to `Zoi.any()`
   - Only public resource attributes are included by default
   """
+
+  alias Ash.Resource.Info, as: ResourceInfo
+  alias Ash.Type.NewType
+
   @doc """
   Converts an Ash type (with optional constraints) into a Zoi validation schema.
 
@@ -200,7 +204,7 @@ defmodule AshZoi do
   end
 
   # Internal helper with depth tracking for NewType unwrapping
-  defp to_schema_with_depth(_type, _constraints, depth) when depth >= @max_new_type_depth do
+  defp to_schema_with_depth(_, _, depth) when depth >= @max_new_type_depth do
     raise ArgumentError,
           "NewType unwrapping exceeded maximum depth of #{@max_new_type_depth}. " <>
             "This may indicate circular NewType definitions."
@@ -240,7 +244,7 @@ defmodule AshZoi do
   defp ash_resource?(type) when is_atom(type) and not is_nil(type) do
     Code.ensure_loaded?(type) and
       function_exported?(type, :spark_is, 0) and
-      Ash.Resource.Info.resource?(type)
+      ResourceInfo.resource?(type)
   end
 
   defp ash_resource?(_), do: false
@@ -248,7 +252,7 @@ defmodule AshZoi do
   # Helper to check if a type is an Ash NewType (including TypedStruct)
   defp ash_new_type?(type) when is_atom(type) and not is_nil(type) do
     Code.ensure_loaded?(type) and
-      Ash.Type.NewType.new_type?(type)
+      NewType.new_type?(type)
   end
 
   defp ash_new_type?(_), do: false
@@ -314,7 +318,7 @@ defmodule AshZoi do
     Zoi.float(opts)
   end
 
-  defp type_to_schema(Ash.Type.Boolean, _constraints) do
+  defp type_to_schema(Ash.Type.Boolean, _) do
     Zoi.boolean()
   end
 
@@ -347,43 +351,43 @@ defmodule AshZoi do
     end
   end
 
-  defp type_to_schema(Ash.Type.Date, _constraints) do
+  defp type_to_schema(Ash.Type.Date, _) do
     Zoi.date()
   end
 
-  defp type_to_schema(Ash.Type.Time, _constraints) do
+  defp type_to_schema(Ash.Type.Time, _) do
     Zoi.time()
   end
 
-  defp type_to_schema(Ash.Type.TimeUsec, _constraints) do
+  defp type_to_schema(Ash.Type.TimeUsec, _) do
     Zoi.time()
   end
 
-  defp type_to_schema(Ash.Type.DateTime, _constraints) do
+  defp type_to_schema(Ash.Type.DateTime, _) do
     Zoi.datetime()
   end
 
-  defp type_to_schema(Ash.Type.NaiveDatetime, _constraints) do
+  defp type_to_schema(Ash.Type.NaiveDatetime, _) do
     Zoi.naive_datetime()
   end
 
-  defp type_to_schema(Ash.Type.UtcDatetime, _constraints) do
+  defp type_to_schema(Ash.Type.UtcDatetime, _) do
     Zoi.datetime()
   end
 
-  defp type_to_schema(Ash.Type.UtcDatetimeUsec, _constraints) do
+  defp type_to_schema(Ash.Type.UtcDatetimeUsec, _) do
     Zoi.datetime()
   end
 
-  defp type_to_schema(Ash.Type.UUID, _constraints) do
+  defp type_to_schema(Ash.Type.UUID, _) do
     Zoi.uuid()
   end
 
-  defp type_to_schema(Ash.Type.UUIDv7, _constraints) do
+  defp type_to_schema(Ash.Type.UUIDv7, _) do
     Zoi.uuid()
   end
 
-  defp type_to_schema(Ash.Type.Binary, _constraints) do
+  defp type_to_schema(Ash.Type.Binary, _) do
     # Binary maps to string as closest equivalent
     Zoi.string()
   end
@@ -399,7 +403,7 @@ defmodule AshZoi do
     end
   end
 
-  defp type_to_schema(Ash.Type.Module, _constraints) do
+  defp type_to_schema(Ash.Type.Module, _) do
     Zoi.module()
   end
 
@@ -483,17 +487,15 @@ defmodule AshZoi do
 
   # Check if unknown type is an Ash resource before falling back to any()
   defp type_to_schema(type, constraints) when is_atom(type) do
-    cond do
-      ash_resource?(type) ->
-        resource_to_schema(type, constraints)
-
-      true ->
-        Zoi.any()
+    if ash_resource?(type) do
+      resource_to_schema(type, constraints)
+    else
+      Zoi.any()
     end
   end
 
   # Fallback for unknown or unsupported types
-  defp type_to_schema(_type, _constraints) do
+  defp type_to_schema(_, _) do
     Zoi.any()
   end
 
@@ -572,7 +574,7 @@ defmodule AshZoi do
     only = Keyword.get(constraints, :only, nil)
     except = Keyword.get(constraints, :except, [])
 
-    attributes = Ash.Resource.Info.attributes(resource)
+    attributes = ResourceInfo.attributes(resource)
 
     # Filter to public attributes by default
     attributes = Enum.filter(attributes, & &1.public?)
