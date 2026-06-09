@@ -1223,4 +1223,120 @@ defmodule AshZoiTest do
       assert {:error, _} = Zoi.parse(schema, %{title: "Bug", status: "invalid"})
     end
   end
+
+  describe "coerce: true option" do
+    test "coerces float to Decimal for decimal fields" do
+      schema = AshZoi.to_schema(:decimal, coerce: true)
+
+      assert {:ok, result} = Zoi.parse(schema, 100_000.0)
+      assert %Decimal{} = result
+      assert Decimal.equal?(result, Decimal.from_float(100_000.0))
+    end
+
+    test "coerces integer to Decimal for decimal fields" do
+      schema = AshZoi.to_schema(:decimal, coerce: true)
+
+      assert {:ok, result} = Zoi.parse(schema, 42)
+      assert %Decimal{} = result
+      assert Decimal.equal?(result, Decimal.new(42))
+    end
+
+    test "coerces string to Decimal for decimal fields" do
+      schema = AshZoi.to_schema(:decimal, coerce: true)
+
+      assert {:ok, result} = Zoi.parse(schema, "99.95")
+      assert %Decimal{} = result
+      assert Decimal.equal?(result, Decimal.new("99.95"))
+    end
+
+    test "coerces string keys to atom keys in maps" do
+      schema = AshZoi.to_schema(AshZoiTest.TestAddress, coerce: true)
+
+      assert {:ok, %{street: "Main", city: "Springfield", zip: "12345"}} =
+               Zoi.parse(schema, %{"street" => "Main", "city" => "Springfield", "zip" => "12345"})
+    end
+
+    test "coerces string to integer" do
+      schema = AshZoi.to_schema(:integer, coerce: true)
+      assert {:ok, 42} = Zoi.parse(schema, "42")
+    end
+
+    test "coerces string to date" do
+      schema = AshZoi.to_schema(:date, coerce: true)
+      assert {:ok, ~D[2026-03-26]} = Zoi.parse(schema, "2026-03-26")
+    end
+
+    test "coerces string enum values to atoms for Ash.Type.Enum" do
+      schema = AshZoi.to_schema(AshZoiTest.TestStatus, coerce: true)
+      assert {:ok, :open} = Zoi.parse(schema, "open")
+    end
+
+    test "coerces money map with float amount from JSON" do
+      schema = AshZoi.to_schema(AshMoney.Types.Money, coerce: true)
+
+      assert {:ok, %{currency: "DKK", amount: amount}} =
+               Zoi.parse(schema, %{"currency" => "DKK", "amount" => 100_000.0})
+
+      assert %Decimal{} = amount
+      assert Decimal.equal?(amount, Decimal.from_float(100_000.0))
+    end
+
+    test "coerces money map with integer amount from JSON" do
+      schema = AshZoi.to_schema(AshMoney.Types.Money, coerce: true)
+
+      assert {:ok, %{currency: "USD", amount: amount}} =
+               Zoi.parse(schema, %{"currency" => "USD", "amount" => 42})
+
+      assert %Decimal{} = amount
+      assert Decimal.equal?(amount, Decimal.new(42))
+    end
+
+    test "coerces nested resource with money and enum from JSON" do
+      defmodule TestInvoice do
+        @moduledoc false
+        use Ash.Resource, data_layer: :embedded
+
+        attributes do
+          attribute(:description, :string, public?: true, allow_nil?: false)
+          attribute(:amount, AshMoney.Types.Money, public?: true, allow_nil?: false)
+          attribute(:status, AshZoiTest.TestStatus, public?: true, allow_nil?: false)
+        end
+      end
+
+      schema = AshZoi.to_schema(TestInvoice, coerce: true)
+
+      # Simulate raw JSON-parsed LLM response
+      raw = %{
+        "description" => "Widget order",
+        "amount" => %{"currency" => "DKK", "amount" => 99.95},
+        "status" => "pending"
+      }
+
+      assert {:ok, result} = Zoi.parse(schema, raw)
+      assert result.description == "Widget order"
+      assert result.status == :pending
+      assert result.amount.currency == "DKK"
+      assert Decimal.equal?(result.amount.amount, Decimal.from_float(99.95))
+    end
+
+    test "coerces float to Decimal inside arrays" do
+      schema = AshZoi.to_schema({:array, :decimal}, coerce: true)
+
+      assert {:ok, [a, b]} = Zoi.parse(schema, [100.0, 99.95])
+      assert Decimal.equal?(a, Decimal.from_float(100.0))
+      assert Decimal.equal?(b, Decimal.from_float(99.95))
+    end
+
+    test "without coerce, float decimal fails" do
+      schema = AshZoi.to_schema(:decimal)
+      assert {:error, _} = Zoi.parse(schema, 100_000.0)
+    end
+
+    test "without coerce, string keys fail for resources" do
+      schema = AshZoi.to_schema(AshZoiTest.TestAddress)
+
+      assert {:error, _} =
+               Zoi.parse(schema, %{"street" => "Main", "city" => "Springfield", "zip" => "12345"})
+    end
+  end
 end

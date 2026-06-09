@@ -162,6 +162,14 @@ defmodule AshZoi do
   - `constraints` - A keyword list of Ash constraints to apply. For Ash resources, you can also
     pass `:only` and `:except` options to control which attributes are included in the schema.
 
+  ## Options
+
+  - `:coerce` - When `true`, enables `Zoi.coerce/1` on all nodes in the generated schema.
+    This allows `Zoi.parse/2` to automatically coerce values to the expected types —
+    for example, converting JSON floats to `Decimal`, strings to enum atoms, and
+    string map keys to atom keys. Useful when parsing raw JSON (e.g. from LLM responses)
+    that needs to be cast through Ash types.
+
   ## Examples
 
       iex> schema = AshZoi.to_schema(:string)
@@ -188,19 +196,25 @@ defmodule AshZoi do
 
   # Handle array types
   def to_schema({:array, inner_type}, constraints) do
+    {ash_zoi_opts, constraints} = extract_ash_zoi_opts(constraints)
+
     # Separate array-level and element-level constraints
     {array_opts, element_constraints} = extract_array_constraints(constraints)
 
-    # Recursively convert the inner type with element constraints
-    inner_schema = to_schema(inner_type, element_constraints)
+    # Pass coerce option through to inner type
+    inner_schema = to_schema(inner_type, ash_zoi_opts ++ element_constraints)
 
     # Create array schema with array-level constraints
     Zoi.array(inner_schema, array_opts)
+    |> maybe_enable_coerce(ash_zoi_opts)
   end
 
   # Handle all other types
   def to_schema(type, constraints) do
+    {ash_zoi_opts, constraints} = extract_ash_zoi_opts(constraints)
+
     to_schema_with_depth(type, constraints, 0)
+    |> maybe_enable_coerce(ash_zoi_opts)
   end
 
   # Internal helper with depth tracking for NewType unwrapping
@@ -279,6 +293,20 @@ defmodule AshZoi do
   end
 
   defp resolve_type(type), do: type
+
+  # Extract AshZoi-specific options (like :coerce) from the constraints list
+  defp extract_ash_zoi_opts(constraints) do
+    {Keyword.take(constraints, [:coerce]), Keyword.drop(constraints, [:coerce])}
+  end
+
+  # When coerce: true, enable Zoi coercion on all nodes in the schema tree
+  defp maybe_enable_coerce(schema, opts) do
+    if opts[:coerce] do
+      schema |> Zoi.Schema.traverse(&Zoi.coerce/1) |> Zoi.coerce()
+    else
+      schema
+    end
+  end
 
   # Extract array-specific constraints from the constraint list
   defp extract_array_constraints(constraints) do
@@ -500,15 +528,11 @@ defmodule AshZoi do
   end
 
   # Map string-specific constraints
-  defp map_string_constraints(nil), do: []
-
   defp map_string_constraints(constraints) do
     Keyword.take(constraints, [:min_length, :max_length])
   end
 
   # Map numeric constraints (integer/float)
-  defp map_numeric_constraints(nil), do: []
-
   defp map_numeric_constraints(constraints) do
     []
     |> maybe_add_constraint(:gte, constraints, :min)
@@ -518,8 +542,6 @@ defmodule AshZoi do
   end
 
   # Map decimal constraints
-  defp map_decimal_constraints(nil), do: []
-
   defp map_decimal_constraints(constraints) do
     []
     |> maybe_add_decimal_constraint(:gte, constraints, :min)
