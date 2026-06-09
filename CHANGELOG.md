@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-09
+
+### Added
+
+- `:coerce` option for `to_schema/2` — when `coerce: true` is passed, enables
+  `Zoi.coerce/1` on all nodes in the generated schema. This allows `Zoi.parse/2`
+  to automatically coerce values to expected types: JSON floats to `Decimal`,
+  strings to enum atoms, and string map keys to atom keys. Useful when parsing
+  raw JSON (e.g. from LLM responses) that needs to be cast through Ash types.
+
 ## [0.3.0] - 2026-06-04
 
 ### Added
@@ -54,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   constraints
 - Depth-limited NewType unwrapping to prevent infinite recursion
 
+[0.4.0]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.3.0
 [0.2.1]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.2.0
