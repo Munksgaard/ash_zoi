@@ -6,10 +6,16 @@ defmodule AshZoiTest do
   use ExUnit.Case, async: true
   doctest AshZoi
 
+  alias Ash.Resource.Info, as: ResourceInfo
+
   # Test Ash resources for testing resource conversion
   defmodule TestAddress do
     @moduledoc false
     use Ash.Resource, data_layer: :embedded
+
+    resource do
+      description("A postal address.")
+    end
 
     attributes do
       attribute(:street, :string, public?: true, allow_nil?: false)
@@ -596,6 +602,25 @@ defmodule AshZoiTest do
   end
 
   describe "Ash resource to schema" do
+    test "preserves the resource description in the generated schema" do
+      description = ResourceInfo.description(TestAddress)
+      assert description == "A postal address."
+
+      schema = AshZoi.to_schema(TestAddress)
+
+      assert Zoi.description(schema) == description
+      assert Zoi.to_json_schema(schema)[:description] == description
+    end
+
+    test "handles resources without a description" do
+      assert ResourceInfo.description(TestUser) == nil
+
+      schema = AshZoi.to_schema(TestUser)
+
+      assert Zoi.description(schema) == nil
+      refute Map.has_key?(Zoi.to_json_schema(schema), :description)
+    end
+
     test "converts a simple resource to a map schema" do
       schema = AshZoi.to_schema(TestAddress)
 
