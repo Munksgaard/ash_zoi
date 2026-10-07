@@ -622,6 +622,12 @@ defmodule AshZoi do
         Map.put(acc, attr.name, schema)
       end)
 
-    Zoi.map(field_schemas)
+    opts =
+      case ResourceInfo.description(resource) do
+        nil -> []
+        description -> [description: description]
+      end
+
+    Zoi.map(field_schemas, opts)
   end
 end
