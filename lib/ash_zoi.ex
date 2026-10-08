@@ -69,8 +69,12 @@ defmodule AshZoi do
       defmodule MyApp.User do
         use Ash.Resource
 
+        resource do
+          description "A registered user"
+        end
+
         attributes do
-          attribute :name, :string, allow_nil?: false
+          attribute :name, :string, allow_nil?: false, description: "Display name"
           attribute :email, :string, allow_nil?: false
           attribute :age, :integer, constraints: [min: 0, max: 150]
         end
@@ -96,13 +100,13 @@ defmodule AshZoi do
         typed_struct do
           field :username, :string, allow_nil?: false
           field :age, :integer, constraints: [min: 0, max: 150]
-          field :bio, :string
+          field :bio, :string, description: "Shown on the profile page"
         end
       end
 
       # Converts to a map schema with field validation
       AshZoi.to_schema(MyProfile)
-      #=> Zoi.map(%{username: Zoi.string(), age: Zoi.integer(gte: 0, lte: 150), bio: Zoi.nullable(Zoi.string())})
+      #=> Zoi.map(%{username: Zoi.string(), age: Zoi.integer(gte: 0, lte: 150), bio: Zoi.nullable(Zoi.string(), description: "Shown on the profile page")})
 
   ## NewType Support
 
@@ -143,6 +147,10 @@ defmodule AshZoi do
     Set `allow_nil?: false` on your Ash attributes to make them required in the generated schema.
   - Map field definitions (`:map` type with `:fields` constraint) default `allow_nil?` to `false`,
     matching Ash's map field defaults.
+  - The `description` of a resource, and of each attribute or map/typed struct field, becomes the
+    description of its schema, so `Zoi.to_json_schema/1` and `Zoi.describe/1` include it. On a
+    nullable field it sits on the outer `anyOf`. Field descriptions that are not a non-empty string
+    are ignored.
   - Constraints that don't apply to a type are silently ignored
   - Map fields without a `:type` default to `:any`
   - Unknown/unsupported Ash types fall back to `Zoi.any()`
