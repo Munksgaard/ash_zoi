@@ -87,6 +87,21 @@ defmodule AshZoiTest do
     end
   end
 
+  defmodule TestDescribedNesting do
+    @moduledoc false
+    use Ash.Resource, data_layer: :embedded
+
+    attributes do
+      attribute(:person, TestDescribed,
+        public?: true,
+        allow_nil?: false,
+        description: "Who it is"
+      )
+
+      attribute(:profile, TestDescribedProfile, public?: true, allow_nil?: false)
+    end
+  end
+
   # Test NewType: String with regex constraint
   defmodule TestSSN do
     @moduledoc false
@@ -679,6 +694,42 @@ defmodule AshZoiTest do
       refute Map.has_key?(properties.bio, :description)
       refute Map.has_key?(properties.age, :description)
       assert is_binary(Zoi.describe(schema))
+    end
+
+    test "Zoi.describe/1 renders them" do
+      doc = TestDescribed |> AshZoi.to_schema() |> Zoi.describe()
+
+      assert doc =~ "Full name"
+      assert doc =~ "What friends call them"
+    end
+
+    test "they survive coerce: true" do
+      %{properties: properties} =
+        TestDescribed |> AshZoi.to_schema(coerce: true) |> Zoi.to_json_schema()
+
+      assert properties.name.description == "Full name"
+      assert properties.nickname.description == "What friends call them"
+    end
+
+    test "nested resources and typed structs keep their fields' descriptions" do
+      %{properties: properties} =
+        TestDescribedNesting |> AshZoi.to_schema() |> Zoi.to_json_schema()
+
+      assert properties.person.description == "Who it is"
+      assert properties.person.properties.name.description == "Full name"
+      assert properties.profile.properties.username.description == "Login handle"
+    end
+
+    test "struct fields carry theirs into Zoi.struct/2" do
+      doc =
+        :struct
+        |> AshZoi.to_schema(
+          instance_of: AshZoiTest.SimpleStruct,
+          fields: [name: [type: :string, description: "Display name"], value: [type: :integer]]
+        )
+        |> Zoi.describe()
+
+      assert doc =~ "Display name"
     end
   end
 
