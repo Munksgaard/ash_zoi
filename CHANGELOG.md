@@ -10,9 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Single-variant unions now validate their wrapper and value instead of raising.
+- Handle Ash/Spark's MFA representation of regex constraints on nested fields.
 
 ### Changed
 
+- **Breaking:** Parsing supported Ash types now returns native values: `%Ash.Union{}`,
+  `%Money{}`, `%Ash.CiString{}`, resource structs, and TypedStruct structs instead of
+  their input maps/strings. Nested values and NewType subtypes are converted too.
+  JSON Schema continues to describe input shapes; Elixir typespecs describe outputs.
+  Resource parsing constructs structs without running Ash actions or authorization.
+- Money parsing now validates currency codes and rejects non-finite amounts via
+  `Money.new/3`, returning Zoi errors rather than invalid money maps.
 - Require Zoi `~> 0.18.11` for improved discriminated unions and JSON Schema encoding.
 
 ## [0.5.0] - 2026-10-07

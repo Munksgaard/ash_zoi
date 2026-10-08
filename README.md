@@ -20,6 +20,36 @@ end
 
 ## Usage
 
+### Native parsed values
+
+`Zoi.parse/2` returns native values for supported Ash types, not their input
+representations:
+
+| Ash type | Parsed value |
+|----------|--------------|
+| Union | `%Ash.Union{type: variant_name, value: parsed_value}` |
+| `AshMoney.Types.Money` | `%Money{}` (normalized currency and Decimal amount) |
+| `:ci_string` | `%Ash.CiString{}` |
+| Ash resource | The resource's struct |
+| `Ash.TypedStruct` | The TypedStruct's struct |
+| Enum | An atom |
+| Decimal, date/time | The corresponding Elixir struct |
+| Plain map, scalar | A map or scalar, with typed children parsed recursively |
+
+This also applies inside arrays, NewTypes, unions, and nullable fields.
+Native output does not require `coerce: true`; that option only enables input
+coercion (for example, string keys or numeric strings).
+
+Schemas still describe the **input** format for JSON Schema export. For example,
+a union accepts `_union_type`/`_union_value` maps, while returning `%Ash.Union{}`.
+Elixir typespecs describe the **output** values.
+
+Resource conversion constructs a struct from the validated public attributes.
+It does **not** run Ash actions, authorization, action defaults, or resource-level
+validations. `:only`/`:except` filter the input schema; omitted struct fields keep
+their struct defaults. Unknown/unsupported types still fall back to `Zoi.any()`;
+these conversions do not replace Ash's full casting pipeline or custom callbacks.
+
 ### Basic Type Conversion
 
 Convert Ash type atoms to Zoi schemas:
@@ -129,7 +159,7 @@ Zoi.parse(schema, %{name: "Alice", middle_name: nil})
 
 ### Ash Resources
 
-Convert Ash resources to map schemas based on their attributes:
+Convert Ash resources to map-input schemas that return resource structs:
 
 ```elixir
 defmodule MyApp.Address do
@@ -163,12 +193,12 @@ Zoi.parse(schema, %{
   age: 30,
   address: %{street: "123 Main", city: "Springfield", zip: "12345"}
 })
-#=> {:ok, %{name: "Alice", email: "alice@example.com", ...}}
+#=> {:ok, %MyApp.User{name: "Alice", email: "alice@example.com", address: %MyApp.Address{...}, ...}}
 
 # Only specific attributes
 schema = AshZoi.to_schema(MyApp.User, only: [:name, :email])
 Zoi.parse(schema, %{name: "Alice", email: "alice@example.com"})
-#=> {:ok, %{name: "Alice", email: "alice@example.com"}}
+#=> {:ok, %MyApp.User{name: "Alice", email: "alice@example.com", ...}}
 
 # Exclude specific attributes
 schema = AshZoi.to_schema(MyApp.User, except: [:age])
@@ -176,8 +206,8 @@ schema = AshZoi.to_schema(MyApp.User, except: [:age])
 
 **Notes:**
 
-- Only public attributes (`:public?`) are included
-- Non-public attributes are automatically excluded
+- Only public attributes (`:public?`) are included in the input schema
+- Non-public attributes cannot be supplied through the schema; they retain struct defaults
 - Embedded resources used as attribute types are automatically introspected
 - The `:only` and `:except` options allow fine-grained control over included attributes
 - Ash resource attributes have `allow_nil?: true` by default, making them nullable in the Zoi schema.
@@ -187,7 +217,7 @@ schema = AshZoi.to_schema(MyApp.User, except: [:age])
 
 ### Ash TypedStructs
 
-Convert Ash TypedStructs to map schemas with field validation:
+Convert Ash TypedStructs to map-input schemas with field validation and native struct output:
 
 ```elixir
 defmodule MyApp.Profile do
@@ -204,7 +234,7 @@ end
 # Convert TypedStruct to schema
 schema = AshZoi.to_schema(MyApp.Profile)
 Zoi.parse(schema, %{username: "alice", age: 25, bio: "Hello", website: "https://example.com"})
-#=> {:ok, %{username: "alice", age: 25, bio: "Hello", website: "https://example.com"}}
+#=> {:ok, %MyApp.Profile{username: "alice", age: 25, bio: "Hello", website: "https://example.com"}}
 
 # Field constraints are enforced
 Zoi.parse(schema, %{username: "alice", age: -1, bio: "Hello", website: "https://example.com"})
@@ -216,12 +246,12 @@ Zoi.parse(schema, %{username: nil, age: 25, bio: "Hello", website: "https://exam
 
 # Nullable fields accept nil (default: allow_nil?: true)
 Zoi.parse(schema, %{username: "alice", age: 25, bio: nil, website: "https://example.com"})
-#=> {:ok, %{username: "alice", age: 25, bio: nil, website: "https://example.com"}}
+#=> {:ok, %MyApp.Profile{username: "alice", age: 25, bio: nil, website: "https://example.com"}}
 ```
 
 **Notes:**
 
-- TypedStructs are automatically detected and converted to map schemas
+- TypedStructs validate map inputs and return their native structs
 - Field types and constraints are preserved from the TypedStruct definition
 - `allow_nil?` is respected (defaults to `true` for fields, `false` when explicitly set)
 - All Ash type features (constraints, validations) work with TypedStruct fields
@@ -295,7 +325,7 @@ end
 
 schema = AshZoi.to_schema(MyApp.Ticket)
 Zoi.parse(schema, %{title: "Bug", status: :open})
-#=> {:ok, %{title: "Bug", status: :open}}
+#=> {:ok, %MyApp.Ticket{title: "Bug", status: :open}}
 
 Zoi.parse(schema, %{title: "Bug", status: :invalid})
 #=> {:error, [...]}
@@ -305,7 +335,8 @@ Zoi.parse(schema, %{title: "Bug", status: :invalid})
 
 If you use [`ash_money`](https://hexdocs.pm/ash_money), add it to your dependencies and
 `AshMoney.Types.Money` fields will be converted to a map schema with `currency` (string)
-and `amount` (decimal) fields:
+and `amount` (decimal) fields, returning `%Money{}`. Currency codes are validated
+and normalized by `Money.new/3`; `:ex_money_opts` are forwarded to that constructor:
 
 ```elixir
 # In mix.exs:
@@ -323,7 +354,7 @@ end
 
 schema = AshZoi.to_schema(MyApp.Product)
 Zoi.parse(schema, %{name: "Widget", price: %{currency: "USD", amount: Decimal.new("9.99")}})
-#=> {:ok, %{name: "Widget", price: %{currency: "USD", amount: #Decimal<9.99>}}}
+#=> {:ok, %MyApp.Product{name: "Widget", price: %Money{currency: :USD, amount: #Decimal<9.99>, ...}}}
 
 # min/max constraints apply to the amount
 schema = AshZoi.to_schema(AshMoney.Types.Money, min: 0, max: 1000)
@@ -361,10 +392,10 @@ end
 schema = AshZoi.to_schema(MyApp.Content)
 
 Zoi.parse(schema, %{"_union_type" => "text", "_union_value" => "hello"})
-#=> {:ok, %{"_union_type" => "text", "_union_value" => "hello"}}
+#=> {:ok, %Ash.Union{type: :text, value: "hello"}}
 
 Zoi.parse(schema, %{"_union_type" => "number", "_union_value" => 42})
-#=> {:ok, %{"_union_type" => "number", "_union_value" => 42}}
+#=> {:ok, %Ash.Union{type: :number, value: 42}}
 
 # Unknown variant name
 Zoi.parse(schema, %{"_union_type" => "unknown", "_union_value" => "hello"})
@@ -389,7 +420,7 @@ end
 
 schema = AshZoi.to_schema(MyApp.Post)
 Zoi.parse(schema, %{title: "Hello", content: %{"_union_type" => "text", "_union_value" => "some text"}})
-#=> {:ok, %{title: "Hello", content: %{"_union_type" => "text", ...}}}
+#=> {:ok, %MyApp.Post{title: "Hello", content: %Ash.Union{type: :text, value: "some text"}}}
 ```
 
 You can also pass union types directly:
@@ -402,12 +433,14 @@ schema = AshZoi.to_schema(:union, types: [
 
 # Same-type variants are distinguished by name
 Zoi.parse(schema, %{"_union_type" => "foo", "_union_value" => "hello"})
-#=> {:ok, %{"_union_type" => "foo", "_union_value" => "hello"}}
+#=> {:ok, %Ash.Union{type: :foo, value: "hello"}}
 ```
 
 **Notes:**
 
 - Unions use Ash's `_union_type`/`_union_value` input format with string keys
+- Successful parsing returns `%Ash.Union{}` with a native, recursively parsed value
+- Single-variant unions work the same way; empty unions remain `Zoi.any()`
 - Each variant is identified by name via `Zoi.discriminated_union/3`
 - Same-type variants (e.g., two `:string` variants) are properly distinguished
 - Per-variant constraints are enforced
@@ -430,13 +463,13 @@ The following Ash types are mapped to their Zoi equivalents:
 | Ash Type | Zoi Schema | Notes |
 |----------|------------|-------|
 | `Ash.Type.String` | `Zoi.string()` | Supports `min_length`, `max_length`, `match` (regex) |
-| `Ash.Type.CiString` | `Zoi.string()` | Case-insensitive string, validated as string |
+| `Ash.Type.CiString` | `Zoi.string()` + transform | Returns `%Ash.CiString{}` |
 | `Ash.Type.Integer` | `Zoi.integer()` | Supports `min`, `max`, `greater_than`, `less_than` |
 | `Ash.Type.Float` | `Zoi.float()` | Supports `min`, `max`, `greater_than`, `less_than` |
 | `Ash.Type.Boolean` | `Zoi.boolean()` | |
 | `Ash.Type.Atom` | `Zoi.atom()` or `Zoi.enum()` | With `one_of` constraint → `Zoi.enum()` |
 | `Ash.Type.Decimal` | `Zoi.decimal()` | Supports `min`, `max`, `greater_than`, `less_than` |
-| `AshMoney.Types.Money` | `Zoi.map(%{currency, amount})` | Optional `ash_money` dep; `min`/`max` apply to amount |
+| `AshMoney.Types.Money` | `Zoi.map(%{currency, amount})` + transform | Returns `%Money{}`; optional `ash_money` dep |
 | `Ash.Type.Date` | `Zoi.date()` | |
 | `Ash.Type.Time` | `Zoi.time()` | `TimeUsec` also maps to `time()` |
 | `Ash.Type.DateTime` | `Zoi.datetime()` | All datetime variants map to `datetime()` |
@@ -445,12 +478,12 @@ The following Ash types are mapped to their Zoi equivalents:
 | `Ash.Type.Map` | `Zoi.map()` | With `fields` constraint → `Zoi.map(fields_map)` |
 | `Ash.Type.Struct` | `Zoi.struct()` | With `instance_of` and optional `fields` constraints |
 | `Ash.Type.Module` | `Zoi.module()` | |
-| `Ash.Type.Union` | `Zoi.discriminated_union()` | Uses `_union_type`/`_union_value` format, distinguishes same-type variants |
+| `Ash.Type.Union` | `Zoi.discriminated_union()` + transforms | Wrapper inputs become `%Ash.Union{}` |
 | `Ash.Type.Enum` | `Zoi.enum()` | Custom enum types defined with `use Ash.Type.Enum` |
 | `Ash.Type.Binary` | `Zoi.string()` | Closest equivalent |
 | `Ash.Type.NewType` | (varies) | Recursively resolved to underlying subtype with constraints |
-| `Ash.TypedStruct` | `Zoi.map()` | Introspected from typed struct fields (treated as map) |
-| Ash Resources | `Zoi.map()` | Introspected from resource public attributes |
+| `Ash.TypedStruct` | `Zoi.map()` + transform | Field inputs become TypedStruct structs |
+| Ash Resources | `Zoi.map()` + transform | Public attribute inputs become resource structs |
 | Other types | `Zoi.any()` | Fallback for unknown/custom types |
 
 ## Constraint Mapping

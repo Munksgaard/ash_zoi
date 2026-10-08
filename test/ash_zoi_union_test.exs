@@ -18,7 +18,7 @@ defmodule AshZoi.UnionTest do
 
       for schema <- schemas do
         input = %{"_union_type" => "count", "_union_value" => 1}
-        assert {:ok, ^input} = Zoi.parse(schema, input)
+        assert {:ok, %Ash.Union{type: :count, value: 1}} = Zoi.parse(schema, input)
 
         for invalid <- [
               %{"_union_type" => "other", "_union_value" => 1},
