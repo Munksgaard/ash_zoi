@@ -41,6 +41,18 @@ defmodule AshZoiTest do
     end
   end
 
+  defmodule TestDescribed do
+    @moduledoc false
+    use Ash.Resource, data_layer: :embedded
+
+    attributes do
+      attribute(:name, :string, public?: true, allow_nil?: false, description: "Full name")
+      attribute(:nickname, :string, public?: true, description: "What friends call them")
+      attribute(:tags, {:array, :string}, public?: true, description: "Free-form labels")
+      attribute(:age, :integer, public?: true)
+    end
+  end
+
   # Test TypedStruct for NewType testing
   defmodule TestProfile do
     @moduledoc false
@@ -50,6 +62,62 @@ defmodule AshZoiTest do
       field(:username, :string, allow_nil?: false)
       field(:age, :integer, constraints: [min: 0, max: 150])
       field(:bio, :string)
+    end
+  end
+
+  defmodule TestDescribedProfile do
+    @moduledoc false
+    use Ash.TypedStruct
+
+    typed_struct do
+      field(:username, :string, allow_nil?: false, description: "Login handle")
+      field(:bio, :string, description: "Shown on the profile page")
+      field(:age, :integer)
+    end
+  end
+
+  defmodule TestOddlyDescribed do
+    @moduledoc false
+    use Ash.TypedStruct
+
+    typed_struct do
+      field(:handle, :string, description: :login_handle)
+      field(:bio, :string, description: ~c"charlist")
+      field(:age, :integer, description: "")
+    end
+  end
+
+  defmodule TestDescribedNesting do
+    @moduledoc false
+    use Ash.Resource, data_layer: :embedded
+
+    attributes do
+      attribute(:person, TestDescribed,
+        public?: true,
+        allow_nil?: false,
+        description: "Who it is"
+      )
+
+      attribute(:profile, TestDescribedProfile, public?: true, allow_nil?: false)
+    end
+  end
+
+  defmodule TestMatched do
+    @moduledoc false
+    use Ash.Resource, data_layer: :embedded
+
+    attributes do
+      attribute(:code, :string,
+        public?: true,
+        allow_nil?: false,
+        constraints: [match: ~r/^[A-Z]{3}$/]
+      )
+
+      attribute(:handle, :ci_string,
+        public?: true,
+        allow_nil?: false,
+        constraints: [match: ~r/^[a-z]+$/]
+      )
     end
   end
 
@@ -601,6 +669,89 @@ defmodule AshZoiTest do
     end
   end
 
+  describe "descriptions" do
+    test "resource attributes carry theirs into the JSON schema, nullable or not" do
+      %{properties: properties} = TestDescribed |> AshZoi.to_schema() |> Zoi.to_json_schema()
+
+      assert properties.name.description == "Full name"
+      assert properties.nickname.description == "What friends call them"
+      assert properties.tags.description == "Free-form labels"
+      refute Map.has_key?(properties.age, :description)
+    end
+
+    test "map fields carry theirs into the JSON schema, nullable or not" do
+      schema =
+        AshZoi.to_schema(:map,
+          fields: [
+            name: [type: :string, description: "Full name"],
+            nickname: [type: :string, allow_nil?: true, description: "What friends call them"],
+            age: [type: :integer]
+          ]
+        )
+
+      %{properties: properties} = Zoi.to_json_schema(schema)
+
+      assert properties.name.description == "Full name"
+      assert properties.nickname.description == "What friends call them"
+      refute Map.has_key?(properties.age, :description)
+    end
+
+    test "typed struct fields carry theirs into the JSON schema, nullable or not" do
+      %{properties: properties} =
+        TestDescribedProfile |> AshZoi.to_schema() |> Zoi.to_json_schema()
+
+      assert properties.username.description == "Login handle"
+      assert properties.bio.description == "Shown on the profile page"
+      refute Map.has_key?(properties.age, :description)
+    end
+
+    test "descriptions that are not a non-empty string are left out" do
+      schema = AshZoi.to_schema(TestOddlyDescribed)
+      %{properties: properties} = Zoi.to_json_schema(schema)
+
+      refute Map.has_key?(properties.handle, :description)
+      refute Map.has_key?(properties.bio, :description)
+      refute Map.has_key?(properties.age, :description)
+      assert is_binary(Zoi.describe(schema))
+    end
+
+    test "Zoi.describe/1 renders them" do
+      doc = TestDescribed |> AshZoi.to_schema() |> Zoi.describe()
+
+      assert doc =~ "Full name"
+      assert doc =~ "What friends call them"
+    end
+
+    test "they survive coerce: true" do
+      %{properties: properties} =
+        TestDescribed |> AshZoi.to_schema(coerce: true) |> Zoi.to_json_schema()
+
+      assert properties.name.description == "Full name"
+      assert properties.nickname.description == "What friends call them"
+    end
+
+    test "nested resources and typed structs keep their fields' descriptions" do
+      %{properties: properties} =
+        TestDescribedNesting |> AshZoi.to_schema() |> Zoi.to_json_schema()
+
+      assert properties.person.description == "Who it is"
+      assert properties.person.properties.name.description == "Full name"
+      assert properties.profile.properties.username.description == "Login handle"
+    end
+
+    test "struct fields carry theirs into Zoi.struct/2" do
+      doc =
+        :struct
+        |> AshZoi.to_schema(
+          instance_of: AshZoiTest.SimpleStruct,
+          fields: [name: [type: :string, description: "Display name"], value: [type: :integer]]
+        )
+        |> Zoi.describe()
+
+      assert doc =~ "Display name"
+    end
+  end
+
   describe "Ash resource to schema" do
     test "preserves the resource description in the generated schema" do
       description = ResourceInfo.description(TestAddress)
@@ -633,6 +784,14 @@ defmodule AshZoiTest do
       # zip exceeds max_length of 10
       assert {:error, _} =
                Zoi.parse(schema, %{street: "123 Main", city: "Springfield", zip: "12345678901"})
+    end
+
+    test "applies match constraints on string and ci_string attributes" do
+      schema = AshZoi.to_schema(TestMatched)
+
+      assert {:ok, _} = Zoi.parse(schema, %{code: "ABC", handle: "abc"})
+      assert {:error, _} = Zoi.parse(schema, %{code: "abc", handle: "abc"})
+      assert {:error, _} = Zoi.parse(schema, %{code: "ABC", handle: "abc1"})
     end
 
     test "handles allow_nil? correctly" do

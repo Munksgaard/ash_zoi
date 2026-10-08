@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The `description` of a resource attribute, or of a map or typed struct field,
+  is carried into its field schema, so `Zoi.to_json_schema/1` (and a tool
+  schema built from it) describes each field.
+
 ### Fixed
 
 - Single-variant unions now validate their wrapper and value instead of raising.
+- A resource attribute with a `match` constraint no longer makes `to_schema/2`
+  raise: Spark stores it as `{Spark.Regex, :cache, args}`, not a `Regex`.
 
 ### Changed
 

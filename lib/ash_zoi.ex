@@ -69,8 +69,12 @@ defmodule AshZoi do
       defmodule MyApp.User do
         use Ash.Resource
 
+        resource do
+          description "A registered user"
+        end
+
         attributes do
-          attribute :name, :string, allow_nil?: false
+          attribute :name, :string, allow_nil?: false, description: "Display name"
           attribute :email, :string, allow_nil?: false
           attribute :age, :integer, constraints: [min: 0, max: 150]
         end
@@ -96,13 +100,13 @@ defmodule AshZoi do
         typed_struct do
           field :username, :string, allow_nil?: false
           field :age, :integer, constraints: [min: 0, max: 150]
-          field :bio, :string
+          field :bio, :string, description: "Shown on the profile page"
         end
       end
 
       # Converts to a map schema with field validation
       AshZoi.to_schema(MyProfile)
-      #=> Zoi.map(%{username: Zoi.string(), age: Zoi.integer(gte: 0, lte: 150), bio: Zoi.nullable(Zoi.string())})
+      #=> Zoi.map(%{username: Zoi.string(), age: Zoi.integer(gte: 0, lte: 150), bio: Zoi.nullable(Zoi.string(), description: "Shown on the profile page")})
 
   ## NewType Support
 
@@ -143,6 +147,10 @@ defmodule AshZoi do
     Set `allow_nil?: false` on your Ash attributes to make them required in the generated schema.
   - Map field definitions (`:map` type with `:fields` constraint) default `allow_nil?` to `false`,
     matching Ash's map field defaults.
+  - The `description` of a resource, and of each attribute or map/typed struct field, becomes the
+    description of its schema, so `Zoi.to_json_schema/1` and `Zoi.describe/1` include it. On a
+    nullable field it sits on the outer `anyOf`. Field descriptions that are not a non-empty string
+    are ignored.
   - Constraints that don't apply to a type are silently ignored
   - Map fields without a `:type` default to `:any`
   - Unknown/unsupported Ash types fall back to `Zoi.any()`
@@ -321,19 +329,7 @@ defmodule AshZoi do
   # Map Ash type modules to Zoi schemas
   defp type_to_schema(Ash.Type.String, constraints) do
     opts = map_string_constraints(constraints)
-    schema = Zoi.string(opts)
-
-    # Apply regex constraint as a refinement if present
-    case Keyword.get(constraints, :match) do
-      nil ->
-        schema
-
-      regex when is_struct(regex, Regex) ->
-        Zoi.regex(schema, regex)
-
-      other ->
-        raise ArgumentError, "expected :match constraint to be a Regex, got: #{inspect(other)}"
-    end
+    apply_match(Zoi.string(opts), constraints)
   end
 
   defp type_to_schema(Ash.Type.Integer, constraints) do
@@ -463,18 +459,7 @@ defmodule AshZoi do
 
   defp type_to_schema(Ash.Type.CiString, constraints) do
     opts = map_string_constraints(constraints)
-    schema = Zoi.string(opts)
-
-    case Keyword.get(constraints, :match) do
-      nil ->
-        schema
-
-      regex when is_struct(regex, Regex) ->
-        Zoi.regex(schema, regex)
-
-      other ->
-        raise ArgumentError, "expected :match constraint to be a Regex, got: #{inspect(other)}"
-    end
+    apply_match(Zoi.string(opts), constraints)
   end
 
   # Handle Ash.Type.Struct with instance_of and fields
@@ -536,6 +521,25 @@ defmodule AshZoi do
     Keyword.take(constraints, [:min_length, :max_length])
   end
 
+  # Apply regex constraint as a refinement if present
+  defp apply_match(schema, constraints) do
+    case Keyword.get(constraints, :match) do
+      nil ->
+        schema
+
+      regex when is_struct(regex, Regex) ->
+        Zoi.regex(schema, regex)
+
+      # Spark's `:regex_as_mfa` form, e.g. on resource attributes
+      {module, function, args} ->
+        Zoi.regex(schema, apply(module, function, args))
+
+      other ->
+        raise ArgumentError,
+              "expected :match constraint to be a Regex or {module, function, args}, got: #{inspect(other)}"
+    end
+  end
+
   # Map numeric constraints (integer/float)
   defp map_numeric_constraints(constraints) do
     []
@@ -580,17 +584,13 @@ defmodule AshZoi do
       field_type = Keyword.get(field_spec, :type, :any)
       field_constraints = Keyword.get(field_spec, :constraints, [])
       allow_nil = Keyword.get(field_spec, :allow_nil?, false)
+      description = Keyword.get(field_spec, :description)
 
-      schema = to_schema(field_type, field_constraints)
-
-      final_schema =
-        if allow_nil do
-          Zoi.nullable(schema)
-        else
-          schema
-        end
-
-      Map.put(acc, field_name, final_schema)
+      Map.put(
+        acc,
+        field_name,
+        field_schema(field_type, field_constraints, allow_nil, description)
+      )
     end)
   end
 
@@ -614,15 +614,7 @@ defmodule AshZoi do
     # Build the Zoi map schema from attributes
     field_schemas =
       Enum.reduce(attributes, %{}, fn attr, acc ->
-        schema = to_schema(attr.type, attr.constraints)
-
-        schema =
-          if attr.allow_nil? do
-            Zoi.nullable(schema)
-          else
-            schema
-          end
-
+        schema = field_schema(attr.type, attr.constraints, attr.allow_nil?, attr.description)
         Map.put(acc, attr.name, schema)
       end)
 
@@ -634,4 +626,24 @@ defmodule AshZoi do
 
     Zoi.map(field_schemas, opts)
   end
+
+  defp field_schema(type, constraints, allow_nil?, description) do
+    schema = to_schema(type, constraints)
+
+    schema =
+      if allow_nil? do
+        Zoi.nullable(schema)
+      else
+        schema
+      end
+
+    # On the outermost schema: `Zoi.nullable/1` copies an inner one outward, duplicating it.
+    put_description(schema, description)
+  end
+
+  defp put_description(%{meta: meta} = schema, description)
+       when is_binary(description) and description != "",
+       do: %{schema | meta: %{meta | description: description}}
+
+  defp put_description(schema, _), do: schema
 end
