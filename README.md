@@ -12,8 +12,8 @@ Add `ash_zoi` to your list of dependencies in `mix.exs`:
 def deps do
   [
     {:ash, "~> 3.0"},
-    {:zoi, "~> 0.17.3"},
-    {:ash_zoi, "~> 0.3.0"}
+    {:zoi, "~> 0.17"},
+    {:ash_zoi, "~> 0.5.0"}
   ]
 end
 ```
