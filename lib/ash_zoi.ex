@@ -590,7 +590,11 @@ defmodule AshZoi do
           schema
         end
 
-      Map.put(acc, field_name, final_schema)
+      Map.put(
+        acc,
+        field_name,
+        put_description(final_schema, Keyword.get(field_spec, :description))
+      )
     end)
   end
 
@@ -623,7 +627,7 @@ defmodule AshZoi do
             schema
           end
 
-        Map.put(acc, attr.name, schema)
+        Map.put(acc, attr.name, put_description(schema, attr.description))
       end)
 
     opts =
@@ -634,4 +638,11 @@ defmodule AshZoi do
 
     Zoi.map(field_schemas, opts)
   end
+
+  # On the outermost schema: `Zoi.nullable/1` copies an inner one outward, duplicating it.
+  defp put_description(%{meta: meta} = schema, description)
+       when is_binary(description) and description != "",
+       do: %{schema | meta: %{meta | description: description}}
+
+  defp put_description(schema, _), do: schema
 end
