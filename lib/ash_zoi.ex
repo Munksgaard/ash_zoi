@@ -457,7 +457,7 @@ defmodule AshZoi do
           })
         end)
 
-      Zoi.discriminated_union("_union_type", variant_schemas)
+      discriminated_union("_union_type", variant_schemas)
     end
   end
 
@@ -526,6 +526,10 @@ defmodule AshZoi do
   defp type_to_schema(_, _) do
     Zoi.any()
   end
+
+  defp discriminated_union(_, [schema]), do: schema
+
+  defp discriminated_union(field, schemas), do: Zoi.discriminated_union(field, schemas)
 
   # Map string-specific constraints
   defp map_string_constraints(constraints) do
