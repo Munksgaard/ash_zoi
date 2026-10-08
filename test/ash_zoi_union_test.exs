@@ -1,6 +1,43 @@
 defmodule AshZoi.UnionTest do
   use ExUnit.Case, async: true
 
+  defmodule SingleVariant do
+    use Ash.Type.NewType,
+      subtype_of: :union,
+      constraints: [types: [count: [type: :integer, constraints: [min: 0]]]]
+  end
+
+  describe "single-variant unions" do
+    test "validate the wrapper and value for direct and NewType unions" do
+      schemas = [
+        AshZoi.to_schema(:union,
+          types: [count: [type: :integer, constraints: [min: 0]]]
+        ),
+        AshZoi.to_schema(SingleVariant)
+      ]
+
+      for schema <- schemas do
+        input = %{"_union_type" => "count", "_union_value" => 1}
+        assert {:ok, ^input} = Zoi.parse(schema, input)
+
+        for invalid <- [
+              %{"_union_type" => "other", "_union_value" => 1},
+              %{"_union_type" => "count", "_union_value" => -1},
+              %{"_union_type" => "count", "_union_value" => "1"},
+              %{"_union_type" => "count"},
+              %{"_union_value" => 1},
+              1
+            ] do
+          assert {:error, _} = Zoi.parse(schema, invalid)
+        end
+
+        json = Zoi.to_json_schema(schema)
+        assert json.properties["_union_type"] == %{const: "count"}
+        assert json.properties["_union_value"].minimum == 0
+      end
+    end
+  end
+
   describe "discriminated union regressions" do
     test "variant errors preserve the discriminator, path, and constraint details" do
       schema =

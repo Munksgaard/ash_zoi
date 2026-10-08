@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Single-variant unions now validate their wrapper and value instead of raising.
+
 ### Changed
 
 - Require Zoi `~> 0.18.11` for improved discriminated unions and JSON Schema encoding.
