@@ -3,7 +3,16 @@ defmodule AshZoi do
   Bridges Ash types to Zoi validation schemas.
 
   `AshZoi` provides a simple way to convert Ash type definitions (with constraints)
-  into Zoi validation schemas that can be used for runtime validation.
+  into Zoi validation schemas that validate inputs and return native values.
+
+  Supported unions, money, case-insensitive strings, resources, and TypedStructs
+  return `%Ash.Union{}`, `%Money{}`, `%Ash.CiString{}`, and their respective structs.
+  Conversion also applies to nested values and NewType subtypes. JSON Schema still
+  describes the input format; Elixir typespecs describe the parsed output.
+
+  Resource parsing constructs structs, not persisted records. It does not run Ash
+  actions, authorization, action defaults, or resource-level validations. Unsupported
+  types remain `Zoi.any()`; this is not a replacement for Ash's full casting pipeline.
 
   ## Example
 
@@ -26,26 +35,24 @@ defmodule AshZoi do
       ])
       #=> Zoi.map(%{name: Zoi.string(min_length: 1), age: Zoi.integer()})
 
-      # Ash resources
+      # Ash resources: validates a map, returns %MyApp.User{}
       AshZoi.to_schema(MyApp.User)
-      #=> Zoi.map(%{name: ..., email: ..., age: ...})
 
-      # Ash TypedStructs
+      # Ash TypedStructs: validates a map, returns %MyProfile{}
       AshZoi.to_schema(MyProfile)
-      #=> Zoi.map(%{username: ..., age: ..., bio: ...})
 
   ## Type Mapping
 
   The following Ash types are mapped to their Zoi equivalents:
 
   - `Ash.Type.String` → `Zoi.string()`
-  - `Ash.Type.CiString` → `Zoi.string()` (case-insensitive string, validated as string)
+  - `Ash.Type.CiString` → `Zoi.string()` with transformation to `%Ash.CiString{}`
   - `Ash.Type.Integer` → `Zoi.integer()`
   - `Ash.Type.Float` → `Zoi.float()`
   - `Ash.Type.Boolean` → `Zoi.boolean()`
   - `Ash.Type.Atom` → `Zoi.atom()` or `Zoi.enum()` (with `one_of` constraint)
   - `Ash.Type.Decimal` → `Zoi.decimal()`
-  - `AshMoney.Types.Money` → `Zoi.map(%{currency: Zoi.string(), amount: Zoi.decimal()})` (requires optional `ash_money` dependency)
+  - `AshMoney.Types.Money` → Map input transformed to `%Money{}` (requires optional `ash_money` dependency)
   - `Ash.Type.Date` → `Zoi.date()`
   - `Ash.Type.Time` → `Zoi.time()`
   - `Ash.Type.DateTime` → `Zoi.datetime()`
@@ -54,17 +61,17 @@ defmodule AshZoi do
   - `Ash.Type.Map` → `Zoi.map()` (with optional `fields` constraint)
   - `Ash.Type.Struct` → `Zoi.struct()` (with `instance_of` and `fields`)
   - `Ash.Type.Module` → `Zoi.module()`
-  - `Ash.Type.Union` → `Zoi.discriminated_union()` (using `_union_type`/`_union_value` format)
+  - `Ash.Type.Union` → `Zoi.discriminated_union()` (wrapper input, `%Ash.Union{}` output)
   - `Ash.Type.Enum` → `Zoi.enum()` (custom enum types defined with `use Ash.Type.Enum`)
-  - Ash Resources → `Zoi.map()` (introspected from resource attributes)
+  - Ash Resources → `Zoi.map()` with transformation to the resource struct
   - `Ash.Type.NewType` → Recursively resolved to underlying subtype
-  - `Ash.TypedStruct` → `Zoi.map()` (introspected from typed struct fields)
+  - `Ash.TypedStruct` → `Zoi.map()` with transformation to the TypedStruct struct
   - Other types → `Zoi.any()`
 
   ## Ash Resource Support
 
   When you pass an Ash resource module to `to_schema/2`, it will introspect the resource's
-  public attributes and generate a Zoi map schema:
+  public attributes and generate a Zoi map-input schema returning resource structs:
 
       defmodule MyApp.User do
         use Ash.Resource
@@ -87,8 +94,8 @@ defmodule AshZoi do
 
   ## TypedStruct Support
 
-  Ash TypedStructs are fully supported and automatically converted to map schemas
-  with field validation:
+  Ash TypedStructs use map-input schemas with field validation, returning their
+  native structs after successful parsing:
 
       defmodule MyProfile do
         use Ash.TypedStruct
@@ -100,9 +107,10 @@ defmodule AshZoi do
         end
       end
 
-      # Converts to a map schema with field validation
-      AshZoi.to_schema(MyProfile)
-      #=> Zoi.map(%{username: Zoi.string(), age: Zoi.integer(gte: 0, lte: 150), bio: Zoi.nullable(Zoi.string())})
+      # Validates a map with username/age/bio fields and returns %MyProfile{}
+      schema = AshZoi.to_schema(MyProfile)
+      Zoi.parse(schema, %{username: "alice", age: 30, bio: nil})
+      #=> {:ok, %MyProfile{username: "alice", age: 30, bio: nil}}
 
   ## NewType Support
 
@@ -320,20 +328,7 @@ defmodule AshZoi do
 
   # Map Ash type modules to Zoi schemas
   defp type_to_schema(Ash.Type.String, constraints) do
-    opts = map_string_constraints(constraints)
-    schema = Zoi.string(opts)
-
-    # Apply regex constraint as a refinement if present
-    case Keyword.get(constraints, :match) do
-      nil ->
-        schema
-
-      regex when is_struct(regex, Regex) ->
-        Zoi.regex(schema, regex)
-
-      other ->
-        raise ArgumentError, "expected :match constraint to be a Regex, got: #{inspect(other)}"
-    end
+    string_schema(constraints)
   end
 
   defp type_to_schema(Ash.Type.Integer, constraints) do
@@ -372,10 +367,11 @@ defmodule AshZoi do
     defp type_to_schema(AshMoney.Types.Money, constraints) do
       amount_opts = map_decimal_constraints(constraints)
 
-      Zoi.map(%{
-        currency: Zoi.string(),
-        amount: Zoi.decimal(amount_opts)
-      })
+      Zoi.map(
+        %{currency: Zoi.string(), amount: Zoi.decimal(amount_opts)},
+        typespec: quote(do: Money.t())
+      )
+      |> Zoi.transform({AshZoi.Transforms, :to_money, [constraints[:ex_money_opts] || []]})
     end
   end
 
@@ -435,51 +431,40 @@ defmodule AshZoi do
     Zoi.module()
   end
 
-  # Handle CiString explicitly (before catch-all)
-  # Handle Ash.Type.Union - convert union variants to a Zoi discriminated union.
-  # Each variant becomes a map with "_union_type" (the variant name as a string)
-  # and "_union_value" (the variant's schema), matching Ash's input format for unions.
+  # Validate Ash's wrapper input format, then construct the native union value.
+  # Transform each variant separately so we never convert an input string to an atom.
   defp type_to_schema(Ash.Type.Union, constraints) do
-    types = Keyword.get(constraints, :types, [])
+    variant_schemas =
+      Enum.map(Keyword.get(constraints, :types, []), fn {name, config} ->
+        value_schema = to_schema(config[:type], config[:constraints] || [])
 
-    if types == [] do
-      Zoi.any()
-    else
-      variant_schemas =
-        Enum.map(types, fn {name, config} ->
-          variant_type = config[:type]
-          variant_constraints = config[:constraints] || []
-          value_schema = to_schema(variant_type, variant_constraints)
-
-          Zoi.map(%{
+        Zoi.map(
+          %{
             "_union_type" => Zoi.literal(to_string(name)),
             "_union_value" => value_schema
-          })
-        end)
+          },
+          typespec:
+            quote do
+              %Ash.Union{type: unquote(name), value: unquote(Zoi.type_spec(value_schema))}
+            end
+        )
+        |> Zoi.transform({AshZoi.Transforms, :to_union, [name]})
+      end)
 
-      discriminated_union("_union_type", variant_schemas)
+    case variant_schemas do
+      [] -> Zoi.any()
+      [schema] -> schema
+      schemas -> Zoi.discriminated_union("_union_type", schemas)
     end
   end
 
   defp type_to_schema(Ash.Type.CiString, constraints) do
-    opts = map_string_constraints(constraints)
-    schema = Zoi.string(opts)
-
-    case Keyword.get(constraints, :match) do
-      nil ->
-        schema
-
-      regex when is_struct(regex, Regex) ->
-        Zoi.regex(schema, regex)
-
-      other ->
-        raise ArgumentError, "expected :match constraint to be a Regex, got: #{inspect(other)}"
-    end
+    string_schema(constraints, typespec: quote(do: Ash.CiString.t()))
+    |> Zoi.transform({AshZoi.Transforms, :to_ci_string, [constraints[:casing]]})
   end
 
   # Handle Ash.Type.Struct with instance_of and fields
-  # TypedStructs are validated as maps because input data is typically
-  # a plain map (from JSON, forms, etc.), not a struct instance.
+  # TypedStructs validate map inputs, then construct their native struct.
   defp type_to_schema(Ash.Type.Struct, constraints) do
     instance_of = Keyword.get(constraints, :instance_of)
     fields = Keyword.get(constraints, :fields)
@@ -492,7 +477,7 @@ defmodule AshZoi do
       # If instance_of is a NewType (TypedStruct) with fields, use the fields
       # The fields were already extracted from the NewType's subtype_constraints
       ash_new_type?(instance_of) and fields != nil ->
-        Zoi.map(convert_map_fields(fields))
+        native_struct_schema(instance_of, convert_map_fields(fields))
 
       # If instance_of with fields, build Zoi struct with field schemas
       instance_of != nil and fields != nil ->
@@ -513,27 +498,43 @@ defmodule AshZoi do
     end
   end
 
-  # Check if unknown type is an Ash resource before falling back to any()
-  defp type_to_schema(type, constraints) when is_atom(type) do
-    if ash_resource?(type) do
-      resource_to_schema(type, constraints)
-    else
-      Zoi.any()
-    end
-  end
-
   # Fallback for unknown or unsupported types
   defp type_to_schema(_, _) do
     Zoi.any()
   end
 
-  defp discriminated_union(_, [schema]), do: schema
+  defp native_struct_schema(module, fields, opts \\ []) do
+    opts = Keyword.put(opts, :typespec, quote(do: %unquote(module){}))
 
-  defp discriminated_union(field, schemas), do: Zoi.discriminated_union(field, schemas)
+    Zoi.map(fields, opts)
+    |> Zoi.to_struct(module)
+  end
 
-  # Map string-specific constraints
-  defp map_string_constraints(constraints) do
-    Keyword.take(constraints, [:min_length, :max_length])
+  # `Zoi.nullable/2` copies the inner schema's `:typespec` override onto the
+  # union it builds (see `Zoi.Types.Meta.propagate_opts/1`), so a schema whose
+  # output type is overridden (Money, structs, ...) would lose the `nil |` part.
+  # Always use this helper instead of calling `Zoi.nullable/1` directly.
+  defp nullable_schema(schema) do
+    Zoi.nullable(schema, typespec: quote(do: nil | unquote(Zoi.type_spec(schema))))
+  end
+
+  # Build a string schema from Ash string constraints; `opts` are extra Zoi options.
+  defp string_schema(constraints, opts \\ []) do
+    Zoi.string(Keyword.take(constraints, [:min_length, :max_length]) ++ opts)
+    |> maybe_match(Keyword.get(constraints, :match))
+  end
+
+  defp maybe_match(schema, nil), do: schema
+  defp maybe_match(schema, %Regex{} = regex), do: Zoi.regex(schema, regex)
+
+  # Spark stores regex constraints as MFA tuples (`regex_as_mfa`), like Ash itself handles.
+  defp maybe_match(schema, {module, function, args})
+       when is_atom(module) and is_atom(function) and is_list(args) do
+    maybe_match(schema, apply(module, function, args))
+  end
+
+  defp maybe_match(_, other) do
+    raise ArgumentError, "expected :match constraint to be a Regex, got: #{inspect(other)}"
   end
 
   # Map numeric constraints (integer/float)
@@ -545,13 +546,13 @@ defmodule AshZoi do
     |> maybe_add_constraint(:lt, constraints, :less_than)
   end
 
-  # Map decimal constraints
+  # Decimal bounds use the same keys as numeric bounds, but need Decimal values.
   defp map_decimal_constraints(constraints) do
-    []
-    |> maybe_add_decimal_constraint(:gte, constraints, :min)
-    |> maybe_add_decimal_constraint(:lte, constraints, :max)
-    |> maybe_add_decimal_constraint(:gt, constraints, :greater_than)
-    |> maybe_add_decimal_constraint(:lt, constraints, :less_than)
+    constraints
+    |> map_numeric_constraints()
+    |> Enum.map(fn {key, value} ->
+      {key, if(is_number(value), do: Decimal.new(value), else: value)}
+    end)
   end
 
   defp maybe_add_constraint(opts, zoi_key, constraints, ash_key) do
@@ -561,22 +562,9 @@ defmodule AshZoi do
     end
   end
 
-  defp maybe_add_decimal_constraint(opts, zoi_key, constraints, ash_key) do
-    case Keyword.get(constraints, ash_key) do
-      nil ->
-        opts
-
-      value when is_number(value) ->
-        Keyword.put(opts, zoi_key, Decimal.new(value))
-
-      value ->
-        Keyword.put(opts, zoi_key, value)
-    end
-  end
-
   # Convert map fields to Zoi map schema
   defp convert_map_fields(fields) do
-    Enum.reduce(fields, %{}, fn {field_name, field_spec}, acc ->
+    Map.new(fields, fn {field_name, field_spec} ->
       field_type = Keyword.get(field_spec, :type, :any)
       field_constraints = Keyword.get(field_spec, :constraints, [])
       allow_nil = Keyword.get(field_spec, :allow_nil?, false)
@@ -585,12 +573,12 @@ defmodule AshZoi do
 
       final_schema =
         if allow_nil do
-          Zoi.nullable(schema)
+          nullable_schema(schema)
         else
           schema
         end
 
-      Map.put(acc, field_name, final_schema)
+      {field_name, final_schema}
     end)
   end
 
@@ -613,17 +601,17 @@ defmodule AshZoi do
 
     # Build the Zoi map schema from attributes
     field_schemas =
-      Enum.reduce(attributes, %{}, fn attr, acc ->
+      Map.new(attributes, fn attr ->
         schema = to_schema(attr.type, attr.constraints)
 
         schema =
           if attr.allow_nil? do
-            Zoi.nullable(schema)
+            nullable_schema(schema)
           else
             schema
           end
 
-        Map.put(acc, attr.name, schema)
+        {attr.name, schema}
       end)
 
     opts =
@@ -632,6 +620,6 @@ defmodule AshZoi do
         description -> [description: description]
       end
 
-    Zoi.map(field_schemas, opts)
+    native_struct_schema(resource, field_schemas, opts)
   end
 end
