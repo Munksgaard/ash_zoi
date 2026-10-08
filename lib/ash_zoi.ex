@@ -329,19 +329,7 @@ defmodule AshZoi do
   # Map Ash type modules to Zoi schemas
   defp type_to_schema(Ash.Type.String, constraints) do
     opts = map_string_constraints(constraints)
-    schema = Zoi.string(opts)
-
-    # Apply regex constraint as a refinement if present
-    case Keyword.get(constraints, :match) do
-      nil ->
-        schema
-
-      regex when is_struct(regex, Regex) ->
-        Zoi.regex(schema, regex)
-
-      other ->
-        raise ArgumentError, "expected :match constraint to be a Regex, got: #{inspect(other)}"
-    end
+    apply_match(Zoi.string(opts), constraints)
   end
 
   defp type_to_schema(Ash.Type.Integer, constraints) do
@@ -471,18 +459,7 @@ defmodule AshZoi do
 
   defp type_to_schema(Ash.Type.CiString, constraints) do
     opts = map_string_constraints(constraints)
-    schema = Zoi.string(opts)
-
-    case Keyword.get(constraints, :match) do
-      nil ->
-        schema
-
-      regex when is_struct(regex, Regex) ->
-        Zoi.regex(schema, regex)
-
-      other ->
-        raise ArgumentError, "expected :match constraint to be a Regex, got: #{inspect(other)}"
-    end
+    apply_match(Zoi.string(opts), constraints)
   end
 
   # Handle Ash.Type.Struct with instance_of and fields
@@ -542,6 +519,20 @@ defmodule AshZoi do
   # Map string-specific constraints
   defp map_string_constraints(constraints) do
     Keyword.take(constraints, [:min_length, :max_length])
+  end
+
+  # Apply regex constraint as a refinement if present
+  defp apply_match(schema, constraints) do
+    case Keyword.get(constraints, :match) do
+      nil ->
+        schema
+
+      regex when is_struct(regex, Regex) ->
+        Zoi.regex(schema, regex)
+
+      other ->
+        raise ArgumentError, "expected :match constraint to be a Regex, got: #{inspect(other)}"
+    end
   end
 
   # Map numeric constraints (integer/float)
