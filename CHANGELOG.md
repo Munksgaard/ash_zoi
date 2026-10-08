@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Single-variant unions now validate their wrapper and value instead of raising.
+- A resource attribute with a `match` constraint no longer makes `to_schema/2`
+  raise: Spark stores it as `{Spark.Regex, :cache, args}`, not a `Regex`.
 
 ### Changed
 

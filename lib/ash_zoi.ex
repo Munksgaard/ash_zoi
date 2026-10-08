@@ -530,8 +530,13 @@ defmodule AshZoi do
       regex when is_struct(regex, Regex) ->
         Zoi.regex(schema, regex)
 
+      # Spark's `:regex_as_mfa` form, e.g. on resource attributes
+      {module, function, args} ->
+        Zoi.regex(schema, apply(module, function, args))
+
       other ->
-        raise ArgumentError, "expected :match constraint to be a Regex, got: #{inspect(other)}"
+        raise ArgumentError,
+              "expected :match constraint to be a Regex or {module, function, args}, got: #{inspect(other)}"
     end
   end
 

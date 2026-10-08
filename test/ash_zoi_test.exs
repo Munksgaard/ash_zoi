@@ -102,6 +102,25 @@ defmodule AshZoiTest do
     end
   end
 
+  defmodule TestMatched do
+    @moduledoc false
+    use Ash.Resource, data_layer: :embedded
+
+    attributes do
+      attribute(:code, :string,
+        public?: true,
+        allow_nil?: false,
+        constraints: [match: ~r/^[A-Z]{3}$/]
+      )
+
+      attribute(:handle, :ci_string,
+        public?: true,
+        allow_nil?: false,
+        constraints: [match: ~r/^[a-z]+$/]
+      )
+    end
+  end
+
   # Test NewType: String with regex constraint
   defmodule TestSSN do
     @moduledoc false
@@ -765,6 +784,14 @@ defmodule AshZoiTest do
       # zip exceeds max_length of 10
       assert {:error, _} =
                Zoi.parse(schema, %{street: "123 Main", city: "Springfield", zip: "12345678901"})
+    end
+
+    test "applies match constraints on string and ci_string attributes" do
+      schema = AshZoi.to_schema(TestMatched)
+
+      assert {:ok, _} = Zoi.parse(schema, %{code: "ABC", handle: "abc"})
+      assert {:error, _} = Zoi.parse(schema, %{code: "abc", handle: "abc"})
+      assert {:error, _} = Zoi.parse(schema, %{code: "ABC", handle: "abc1"})
     end
 
     test "handles allow_nil? correctly" do
