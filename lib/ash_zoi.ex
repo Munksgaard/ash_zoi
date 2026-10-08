@@ -580,20 +580,12 @@ defmodule AshZoi do
       field_type = Keyword.get(field_spec, :type, :any)
       field_constraints = Keyword.get(field_spec, :constraints, [])
       allow_nil = Keyword.get(field_spec, :allow_nil?, false)
-
-      schema = to_schema(field_type, field_constraints)
-
-      final_schema =
-        if allow_nil do
-          Zoi.nullable(schema)
-        else
-          schema
-        end
+      description = Keyword.get(field_spec, :description)
 
       Map.put(
         acc,
         field_name,
-        put_description(final_schema, Keyword.get(field_spec, :description))
+        field_schema(field_type, field_constraints, allow_nil, description)
       )
     end)
   end
@@ -618,16 +610,8 @@ defmodule AshZoi do
     # Build the Zoi map schema from attributes
     field_schemas =
       Enum.reduce(attributes, %{}, fn attr, acc ->
-        schema = to_schema(attr.type, attr.constraints)
-
-        schema =
-          if attr.allow_nil? do
-            Zoi.nullable(schema)
-          else
-            schema
-          end
-
-        Map.put(acc, attr.name, put_description(schema, attr.description))
+        schema = field_schema(attr.type, attr.constraints, attr.allow_nil?, attr.description)
+        Map.put(acc, attr.name, schema)
       end)
 
     opts =
@@ -639,7 +623,20 @@ defmodule AshZoi do
     Zoi.map(field_schemas, opts)
   end
 
-  # On the outermost schema: `Zoi.nullable/1` copies an inner one outward, duplicating it.
+  defp field_schema(type, constraints, allow_nil?, description) do
+    schema = to_schema(type, constraints)
+
+    schema =
+      if allow_nil? do
+        Zoi.nullable(schema)
+      else
+        schema
+      end
+
+    # On the outermost schema: `Zoi.nullable/1` copies an inner one outward, duplicating it.
+    put_description(schema, description)
+  end
+
   defp put_description(%{meta: meta} = schema, description)
        when is_binary(description) and description != "",
        do: %{schema | meta: %{meta | description: description}}
