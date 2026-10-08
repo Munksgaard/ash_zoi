@@ -1,3 +1,4 @@
 import Config
 
-config :ex_money, default_cldr_backend: AshZoi.Test.Cldr
+config :ash, default_string_length_count: :codepoints
+config :ex_money, auto_start_exchange_rate_service: false
