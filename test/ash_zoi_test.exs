@@ -624,7 +624,7 @@ defmodule AshZoiTest do
     test "converts a simple resource to a map schema" do
       schema = AshZoi.to_schema(TestAddress)
 
-      assert {:ok, %{street: "123 Main St", city: "Springfield", zip: "12345"}} =
+      assert {:ok, %TestAddress{street: "123 Main St", city: "Springfield", zip: "12345"}} =
                Zoi.parse(schema, %{street: "123 Main St", city: "Springfield", zip: "12345"})
     end
 
@@ -709,13 +709,13 @@ defmodule AshZoiTest do
   describe "CiString type" do
     test "converts ci_string to string schema" do
       schema = AshZoi.to_schema(:ci_string)
-      assert {:ok, "hello"} = Zoi.parse(schema, "hello")
+      assert {:ok, %Ash.CiString{string: "hello"}} = Zoi.parse(schema, "hello")
       assert {:error, _} = Zoi.parse(schema, 42)
     end
 
     test "ci_string with constraints" do
       schema = AshZoi.to_schema(:ci_string, min_length: 3)
-      assert {:ok, "hello"} = Zoi.parse(schema, "hello")
+      assert {:ok, %Ash.CiString{string: "hello"}} = Zoi.parse(schema, "hello")
       assert {:error, _} = Zoi.parse(schema, "hi")
     end
   end
@@ -806,7 +806,7 @@ defmodule AshZoiTest do
     test "validates correct values" do
       schema = AshZoi.to_schema(AshZoiTest.TestProfile)
 
-      assert {:ok, %{username: "alice", age: 25, bio: "hello"}} =
+      assert {:ok, %TestProfile{username: "alice", age: 25, bio: "hello"}} =
                Zoi.parse(schema, %{username: "alice", age: 25, bio: "hello"})
     end
   end
@@ -1046,10 +1046,10 @@ defmodule AshZoiTest do
           ]
         )
 
-      assert {:ok, %{"_union_type" => "str", "_union_value" => "hello"}} =
+      assert {:ok, %Ash.Union{type: :str, value: "hello"}} =
                Zoi.parse(schema, %{"_union_type" => "str", "_union_value" => "hello"})
 
-      assert {:ok, %{"_union_type" => "int", "_union_value" => 42}} =
+      assert {:ok, %Ash.Union{type: :int, value: 42}} =
                Zoi.parse(schema, %{"_union_type" => "int", "_union_value" => 42})
 
       # Wrong type for variant
@@ -1070,10 +1070,10 @@ defmodule AshZoiTest do
           ]
         )
 
-      assert {:ok, %{"_union_type" => "foo", "_union_value" => "hello"}} =
+      assert {:ok, %Ash.Union{type: :foo, value: "hello"}} =
                Zoi.parse(schema, %{"_union_type" => "foo", "_union_value" => "hello"})
 
-      assert {:ok, %{"_union_type" => "bar", "_union_value" => "world"}} =
+      assert {:ok, %Ash.Union{type: :bar, value: "world"}} =
                Zoi.parse(schema, %{"_union_type" => "bar", "_union_value" => "world"})
     end
 
@@ -1114,10 +1114,10 @@ defmodule AshZoiTest do
     test "converts NewType wrapping a union" do
       schema = AshZoi.to_schema(AshZoiTest.TestContent)
 
-      assert {:ok, %{"_union_type" => "text", "_union_value" => "hello"}} =
+      assert {:ok, %Ash.Union{type: :text, value: "hello"}} =
                Zoi.parse(schema, %{"_union_type" => "text", "_union_value" => "hello"})
 
-      assert {:ok, %{"_union_type" => "number", "_union_value" => 42}} =
+      assert {:ok, %Ash.Union{type: :number, value: 42}} =
                Zoi.parse(schema, %{"_union_type" => "number", "_union_value" => 42})
     end
 
@@ -1170,10 +1170,10 @@ defmodule AshZoiTest do
   end
 
   describe "AshMoney.Types.Money" do
-    test "converts money to map with currency and amount" do
+    test "converts money input to a Money struct" do
       schema = AshZoi.to_schema(AshMoney.Types.Money)
 
-      assert {:ok, %{currency: "DKK", amount: amount}} =
+      assert {:ok, %Money{currency: :DKK, amount: amount}} =
                Zoi.parse(schema, %{currency: "DKK", amount: Decimal.new("42.50")})
 
       assert Decimal.equal?(amount, Decimal.new("42.50"))
@@ -1277,7 +1277,7 @@ defmodule AshZoiTest do
     test "coerces string keys to atom keys in maps" do
       schema = AshZoi.to_schema(AshZoiTest.TestAddress, coerce: true)
 
-      assert {:ok, %{street: "Main", city: "Springfield", zip: "12345"}} =
+      assert {:ok, %TestAddress{street: "Main", city: "Springfield", zip: "12345"}} =
                Zoi.parse(schema, %{"street" => "Main", "city" => "Springfield", "zip" => "12345"})
     end
 
@@ -1299,7 +1299,7 @@ defmodule AshZoiTest do
     test "coerces money map with float amount from JSON" do
       schema = AshZoi.to_schema(AshMoney.Types.Money, coerce: true)
 
-      assert {:ok, %{currency: "DKK", amount: amount}} =
+      assert {:ok, %Money{currency: :DKK, amount: amount}} =
                Zoi.parse(schema, %{"currency" => "DKK", "amount" => 100_000.0})
 
       assert %Decimal{} = amount
@@ -1309,7 +1309,7 @@ defmodule AshZoiTest do
     test "coerces money map with integer amount from JSON" do
       schema = AshZoi.to_schema(AshMoney.Types.Money, coerce: true)
 
-      assert {:ok, %{currency: "USD", amount: amount}} =
+      assert {:ok, %Money{currency: :USD, amount: amount}} =
                Zoi.parse(schema, %{"currency" => "USD", "amount" => 42})
 
       assert %Decimal{} = amount
@@ -1340,7 +1340,8 @@ defmodule AshZoiTest do
       assert {:ok, result} = Zoi.parse(schema, raw)
       assert result.description == "Widget order"
       assert result.status == :pending
-      assert result.amount.currency == "DKK"
+      assert is_struct(result, TestInvoice)
+      assert %Money{currency: :DKK} = result.amount
       assert Decimal.equal?(result.amount.amount, Decimal.from_float(99.95))
     end
 
