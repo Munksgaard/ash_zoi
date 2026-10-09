@@ -25,3 +25,6 @@ ash_zoi-*.tar
 
 # Dialyzer PLT cache
 /priv/plts/
+
+/.env
+/.env.local
