@@ -4,7 +4,7 @@ defmodule AshZoi.MixProject do
   def project do
     [
       app: :ash_zoi,
-      version: "0.5.0",
+      version: "0.6.0",
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -29,6 +29,7 @@ defmodule AshZoi.MixProject do
     [
       maintainers: ["Philip Munksgaard"],
       licenses: ["MIT"],
+      files: ["lib", "mix.exs", ".formatter.exs", "README.md", "LICENSE", "CHANGELOG.md"],
       links: %{
         "GitHub" => "https://github.com/Munksgaard/ash_zoi",
         "Changelog" => "https://hexdocs.pm/ash_zoi/changelog.html"

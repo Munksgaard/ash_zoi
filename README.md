@@ -13,7 +13,7 @@ def deps do
   [
     {:ash, "~> 3.0"},
     {:zoi, "~> 0.18.11"},
-    {:ash_zoi, "~> 0.5.0"}
+    {:ash_zoi, "~> 0.6.0"}
   ]
 end
 ```
@@ -22,8 +22,9 @@ end
 
 ### Native parsed values
 
-`Zoi.parse/2` returns native values for supported Ash types, not their input
-representations:
+Since **0.6.0**, `Zoi.parse/2` returns native values for supported Ash types, not their
+input representations. When upgrading from 0.5.x, update code that expects maps or
+strings for these types:
 
 | Ash type | Parsed value |
 |----------|--------------|

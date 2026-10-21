@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-21
+
 ### Added
 
 - The `description` of a resource attribute, or of a map or typed struct field,
@@ -17,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Single-variant unions now validate their wrapper and value instead of raising.
 - Handle Spark's MFA representation of regex `match` constraints.
+- Exclude local Dialyzer PLT caches from Hex packages.
 
 ### Changed
 
@@ -28,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Money parsing now validates currency codes and rejects non-finite amounts via
   `Money.new/3`, returning Zoi errors rather than invalid money maps.
 - Require Zoi `~> 0.18.11` for improved discriminated unions and JSON Schema encoding.
+- Update locked dependencies: Ash to 3.36.1, Decimal to 3.2.0, Spark to 2.7.8,
+  and Ymlr to 5.1.6.
 
 ## [0.5.0] - 2026-10-07
 
@@ -102,6 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   constraints
 - Depth-limited NewType unwrapping to prevent infinite recursion
 
+[Unreleased]: https://github.com/Munksgaard/ash_zoi/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.5.0
 [0.4.1]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.4.0
