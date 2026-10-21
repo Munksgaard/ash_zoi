@@ -48,7 +48,7 @@ defmodule AshZoi.NativeValuesTest do
       attribute(:private, :string)
       attribute(:address, Address, public?: true, allow_nil?: false)
       attribute(:choices, {:array, Choice}, public?: true, allow_nil?: false)
-      attribute(:price, Price, public?: true)
+      attribute(:price, Price, public?: true, description: "Order total")
     end
   end
 
@@ -202,6 +202,25 @@ defmodule AshZoi.NativeValuesTest do
 
     schema = AshZoi.to_schema(:map, fields: [price: [type: Price, allow_nil?: true]])
     assert type_spec(schema) =~ "nil | Money.t()"
+  end
+
+  test "described nullable money fields preserve native values and typespecs" do
+    map_schema =
+      AshZoi.to_schema(:map,
+        fields: [price: [type: Price, allow_nil?: true, description: "Order total"]]
+      )
+
+    for schema <- [@order_schema.fields[:price], map_schema.fields[:price]] do
+      assert type_spec(schema) == "nil | Money.t()"
+      assert {:ok, nil} = Zoi.parse(schema, nil)
+
+      assert {:ok, %Money{currency: :USD}} =
+               Zoi.parse(schema, %{currency: "USD", amount: Decimal.new("12.50")})
+
+      json = Zoi.to_json_schema(schema)
+      assert json.description == "Order total"
+      refute Enum.any?(json.anyOf, &Map.has_key?(&1, :description))
+    end
   end
 
   defp profile_input,

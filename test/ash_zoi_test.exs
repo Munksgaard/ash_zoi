@@ -59,20 +59,9 @@ defmodule AshZoiTest do
     use Ash.TypedStruct
 
     typed_struct do
-      field(:username, :string, allow_nil?: false)
-      field(:age, :integer, constraints: [min: 0, max: 150])
-      field(:bio, :string)
-    end
-  end
-
-  defmodule TestDescribedProfile do
-    @moduledoc false
-    use Ash.TypedStruct
-
-    typed_struct do
       field(:username, :string, allow_nil?: false, description: "Login handle")
+      field(:age, :integer, constraints: [min: 0, max: 150])
       field(:bio, :string, description: "Shown on the profile page")
-      field(:age, :integer)
     end
   end
 
@@ -98,7 +87,7 @@ defmodule AshZoiTest do
         description: "Who it is"
       )
 
-      attribute(:profile, TestDescribedProfile, public?: true, allow_nil?: false)
+      attribute(:profile, TestProfile, public?: true, allow_nil?: false)
     end
   end
 
@@ -651,13 +640,24 @@ defmodule AshZoiTest do
   end
 
   describe "descriptions" do
-    test "resource attributes carry theirs into the JSON schema, nullable or not" do
-      %{properties: properties} = TestDescribed |> AshZoi.to_schema() |> Zoi.to_json_schema()
+    test "resource descriptions survive JSON Schema export, describe, and coercion" do
+      for coerce <- [false, true] do
+        schema = AshZoi.to_schema(TestDescribed, coerce: coerce)
+        %{properties: properties} = Zoi.to_json_schema(schema)
 
-      assert properties.name.description == "Full name"
-      assert properties.nickname.description == "What friends call them"
-      assert properties.tags.description == "Free-form labels"
-      refute Map.has_key?(properties.age, :description)
+        assert properties.name.description == "Full name"
+        assert properties.nickname.description == "What friends call them"
+        assert properties.tags.description == "Free-form labels"
+        refute Map.has_key?(properties.age, :description)
+
+        for field <- [properties.nickname, properties.tags] do
+          refute Enum.any?(field.anyOf, &Map.has_key?(&1, :description))
+        end
+
+        doc = Zoi.describe(schema)
+        assert doc =~ "Full name"
+        assert doc =~ "What friends call them"
+      end
     end
 
     test "map fields carry theirs into the JSON schema, nullable or not" do
@@ -675,15 +675,16 @@ defmodule AshZoiTest do
       assert properties.name.description == "Full name"
       assert properties.nickname.description == "What friends call them"
       refute Map.has_key?(properties.age, :description)
+      refute Enum.any?(properties.nickname.anyOf, &Map.has_key?(&1, :description))
     end
 
     test "typed struct fields carry theirs into the JSON schema, nullable or not" do
-      %{properties: properties} =
-        TestDescribedProfile |> AshZoi.to_schema() |> Zoi.to_json_schema()
+      %{properties: properties} = TestProfile |> AshZoi.to_schema() |> Zoi.to_json_schema()
 
       assert properties.username.description == "Login handle"
       assert properties.bio.description == "Shown on the profile page"
       refute Map.has_key?(properties.age, :description)
+      refute Enum.any?(properties.bio.anyOf, &Map.has_key?(&1, :description))
     end
 
     test "descriptions that are not a non-empty string are left out" do
@@ -694,21 +695,6 @@ defmodule AshZoiTest do
       refute Map.has_key?(properties.bio, :description)
       refute Map.has_key?(properties.age, :description)
       assert is_binary(Zoi.describe(schema))
-    end
-
-    test "Zoi.describe/1 renders them" do
-      doc = TestDescribed |> AshZoi.to_schema() |> Zoi.describe()
-
-      assert doc =~ "Full name"
-      assert doc =~ "What friends call them"
-    end
-
-    test "they survive coerce: true" do
-      %{properties: properties} =
-        TestDescribed |> AshZoi.to_schema(coerce: true) |> Zoi.to_json_schema()
-
-      assert properties.name.description == "Full name"
-      assert properties.nickname.description == "What friends call them"
     end
 
     test "nested resources and typed structs keep their fields' descriptions" do
