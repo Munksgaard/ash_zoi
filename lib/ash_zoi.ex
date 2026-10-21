@@ -621,20 +621,14 @@ defmodule AshZoi do
   defp field_schema(type, constraints, allow_nil?, description) do
     schema = to_schema(type, constraints)
 
-    schema =
-      if allow_nil? do
-        nullable_schema(schema)
-      else
-        schema
-      end
+    schema = if allow_nil?, do: nullable_schema(schema), else: schema
 
-    # On the outermost schema: `Zoi.nullable/1` copies an inner one outward, duplicating it.
+    # Describe after wrapping so the description appears only on the outer schema.
     put_description(schema, description)
   end
 
-  defp put_description(%{meta: meta} = schema, description)
-       when is_binary(description) and description != "",
-       do: %{schema | meta: %{meta | description: description}}
+  defp put_description(schema, description) when is_binary(description) and description != "",
+    do: put_in(schema.meta.description, description)
 
   defp put_description(schema, _), do: schema
 end
