@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-03
+
 ### Changed
 
-- Require Zoi `~> 0.19.0`, so ash_zoi can be used alongside req_llm 1.30+.
+- Require Zoi `~> 0.19`, allowing later 0.x releases and compatibility with req_llm 1.30+.
 
 ## [0.6.0] - 2026-10-21
 
@@ -111,7 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   constraints
 - Depth-limited NewType unwrapping to prevent infinite recursion
 
-[Unreleased]: https://github.com/Munksgaard/ash_zoi/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Munksgaard/ash_zoi/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.6.1
 [0.6.0]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.5.0
 [0.4.1]: https://github.com/Munksgaard/ash_zoi/releases/tag/v0.4.1
