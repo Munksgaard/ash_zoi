@@ -4,7 +4,7 @@ defmodule AshZoi.MixProject do
   def project do
     [
       app: :ash_zoi,
-      version: "0.6.0",
+      version: "0.6.1",
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -60,7 +60,7 @@ defmodule AshZoi.MixProject do
     [
       {:ash, "~> 3.0"},
       {:ash_money, "~> 0.2", optional: true},
-      {:zoi, "~> 0.19.0"},
+      {:zoi, "~> 0.19"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.35", only: :dev, runtime: false}
