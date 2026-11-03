@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Require Zoi `~> 0.19.0`, so ash_zoi can be used alongside req_llm 1.30+.
+
 ## [0.6.0] - 2026-10-21
 
 ### Added
