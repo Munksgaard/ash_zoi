@@ -9,6 +9,8 @@ jobs:
   publish:
     name: Publish to Hex.pm
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v6.0.2
@@ -21,7 +23,37 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
+      - name: Extract release notes
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+          changelog = Path("CHANGELOG.md").read_text()
+          section = re.search(
+              rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## |^\[[^\]]+\]:|\Z)",
+              changelog,
+              re.MULTILINE | re.DOTALL,
+          )
+          if not section or not section.group(1).strip():
+              raise SystemExit(f"Missing release notes for {version} in CHANGELOG.md")
+          Path(os.environ["RUNNER_TEMP"], "release-notes.md").write_text(
+              section.group(1).strip() + "\n"
+          )
+          PY
+
       - name: Publish to Hex
         run: mix hex.publish --yes
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
